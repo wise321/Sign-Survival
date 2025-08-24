@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Orbit Survivors — Map Import + Damage Numbers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1220;
+      --panel: #1b2038;
+      --panel-2: #222948;
+      --text: #e9eefc;
+      --text-dim: #b9c0d6;
+      --accent: #64d2ff;
+      --xp: #5adfb2;
+      --danger: #ff6b6b;
+    }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: radial-gradient(1200px 800px at 50% 50%, #12162b, var(--bg));
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans";
+      color: var(--text);
+      user-select: none;
+      overflow: hidden;
+      touch-action: none;
+    }
+    #wrap { position: fixed; inset: 0; display: grid; place-items: center; }
+    #canvas {
+      background: transparent;
+      image-rendering: pixelated;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5), inset 0 0 60px rgba(100, 210, 255, 0.05);
+      border-radius: 10px;
+    }
+
+    /* HUD */
+    #hud {
+      position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 12px; align-items: center; font-weight: 600; pointer-events: none; z-index: 5;
+      text-shadow: 0 1px 0 #0004;
+    }
+    .pill {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+      padding: 8px 12px; border-radius: 999px;
+    }
+    /* Health bar */
+    #healthWrap { position: fixed; top: 44px; left: 12px; width: 280px; z-index: 5; }
+    #healthLabel { font-size: 12px; color: var(--text-dim); margin: 0 0 6px 6px; text-shadow: 0 1px 0 #0004; }
+    #healthBar { width: 100%; height: 14px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; overflow: hidden; }
+    #healthFill { height: 100%; width: 100%; background: linear-gradient(90deg, #3bd16f, #23b45b); transition: width 0.15s ease-out; }
+
+    /* XP bar */
+    #xpbar {
+      position: fixed; top: 44px; left: 50%; transform: translateX(-50%);
+      width: min(70vw, 720px); height: 12px; background: rgba(255,255,255,0.06);
+      border-radius: 999px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); z-index: 5;
+    }
+    #xpfill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--xp), #59f, var(--accent)); transition: width 0.15s ease-out; }
+
+    #over, #upgrades, #start {
+      position: fixed; inset: 0; display: none; place-items: center;
+      background: radial-gradient(1200px 800px at 50% 40%, rgba(25,30,55,0.9), rgba(10,12,24,0.92));
+      backdrop-filter: blur(2px); padding: 20px; z-index: 10;
+    }
+    .panel {
+      width: min(92vw, 760px);
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+      padding: 20px;
+    }
+    .title { font-size: 28px; margin: 2px 0 8px 0; letter-spacing: 0.5px; }
+    .subtitle { color: var(--text-dim); margin-bottom: 18px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+    button {
+      background: linear-gradient(180deg, #2a335c, #25305a); border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text); padding: 12px 14px; border-radius: 10px; cursor: pointer; font-weight: 700; letter-spacing: 0.2px;
+      transition: transform 0.04s ease, background 0.2s ease;
+    }
+    button:hover { transform: translateY(-1px); } button:active { transform: translateY(0); }
+    .accent { background: linear-gradient(180deg, #3a6cf3, #335eea); }
+    .danger { background: linear-gradient(180deg, #ff7d7d, #ef5f5f); }
+    .upgrade { text-align: left; } .upgrade small { display: block; color: var(--text-dim); margin-top: 6px; font-weight: 500; }
+    .danger-text { color: var(--danger) }
+    .tiny { font-size: 12px; color: var(--text-dim) }
+    #corner { position: fixed; right: 12px; bottom: 12px; font-size: 12px; color: var(--text-dim); opacity: 0.8; pointer-events: none; z-index: 3; }
+
+    /* Joystick */
+    #joystick {
+      position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; width: 180px; height: 180px; z-index: 6; touch-action: none;
+    }
+    #joy-base {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: 160px; height: 160px; border-radius: 50%;
+      background: radial-gradient(60px 60px at 50% 50%, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+      border: 1px solid rgba(255,255,255,0.15);
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.5), 0 6px 18px rgba(0,0,0,0.25);
+    }
+    #joy-stick {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: 80px; height: 80px; border-radius: 50%;
+      background: radial-gradient(30px 30px at 40% 35%, #8fd4ff, #2ea5ff);
+      border: 1px solid rgba(255,255,255,0.3);
+      box-shadow: 0 8px 18px rgba(0,0,0,0.35), inset 0 0 10px rgba(255,255,255,0.35);
+    }
+    @media (max-height: 460px) { #joystick { bottom: 8px; transform: translateX(-50%) scale(0.9); } }
+  </style>
+</head>
+<body>
+  <div id="wrap"><canvas id="canvas" width="960" height="540"></canvas></div>
+
+  <div id="hud">
+    <div class="pill" id="time">00:00</div>
+    <div class="pill" id="level">Lv 1</div>
+    <div class="pill" id="kills">Kills 0</div>
+  </div>
+
+  <div id="xpbar"><div id="xpfill"></div></div>
+
+  <div id="healthWrap">
+    <div id="healthLabel">Health</div>
+    <div id="healthBar"><div id="healthFill"></div></div>
+  </div>
+
+  <!-- Touch joystick -->
+  <div id="joystick">
+    <div id="joy-base"></div>
+    <div id="joy-stick"></div>
+  </div>
+
+  <div id="start">
+    <div class="panel">
+      <div class="title">Orbit Survivors — Map Import</div>
+      <div class="subtitle">Place map.png (1920×1080) and enemy1.png … enemy10.png next to this file (or set ASSET_PATH).</div>
+      <div class="grid">
+        <button class="accent" id="btnStart">Start Game</button>
+        <button id="btnHow">How to Play</button>
+      </div>
+      <div id="how" class="subtitle" style="display:none;margin-top:12px">
+        - Move with joystick (touch) or WASD/Arrows.<br/>
+        - Auto-shoots nearest enemy. XP orbs latch and keep homing.<br/>
+        - Constant enemy flow, capped by level. Enemy variety expands as you level.<br/>
+        - Use transparent PNGs. The loader will auto-remove a solid black matte if detected.
+      </div>
+    </div>
+  </div>
+
+  <div id="upgrades">
+    <div class="panel">
+      <div class="title">Choose an Upgrade</div>
+      <div class="grid" id="upgradeGrid"></div>
+      <div style="margin-top:12px" class="tiny">Tip: damage plus pickup range is a great early combo.</div>
+    </div>
+  </div>
+
+  <div id="over">
+    <div class="panel">
+      <div class="title danger-text">Game Over</div>
+      <div class="subtitle" id="summary"></div>
+      <div class="grid">
+        <button class="accent" id="btnRestart">Play Again</button>
+        <button id="btnQuit">Quit</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="corner">Canvas • Map: map.png • Enemies: enemy1.png … enemy10.png • Touch joystick</div>
+
+  <script>
+    "use strict";
+
+    // Config: where your assets live (include trailing slash if a folder)
+    const ASSET_PATH = "./"; // e.g. "./assets/"
+
+    // Canvas and scaling
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d", { alpha: true });
+    const BASE_W = canvas.width;
+    const BASE_H = canvas.height;
+    ctx.imageSmoothingEnabled = false;
+
+    function fitCanvas() {
+      const pad = 20;
+      const availW = Math.min(window.innerWidth - pad, 1400);
+      const availH = Math.min(window.innerHeight - pad, 900);
+      const scale = Math.min(availW / BASE_W, availH / BASE_H);
+      canvas.style.width = (BASE_W * scale) + "px";
+      canvas.style.height = (BASE_H * scale) + "px";
+    }
+    window.addEventListener("resize", fitCanvas);
+    fitCanvas();
+
+    // World size (defaults to 1920x1080; will adapt to your map once it loads)
+    let WORLD_W = 1920;
+    let WORLD_H = 1080;
+    const camera = { x: 0, y: 0 };
+
+    // HUD elements
+    const elTime = document.getElementById("time");
+    const elLevel = document.getElementById("level");
+    const elKills = document.getElementById("kills");
+    const elXPFill = document.getElementById("xpfill");
+    const elHealthFill = document.getElementById("healthFill");
+    const elHealthLabel = document.getElementById("healthLabel");
+
+    const startOverlay = document.getElementById("start");
+    const upgradesOverlay = document.getElementById("upgrades");
+    const overOverlay = document.getElementById("over");
+    const btnStart = document.getElementById("btnStart");
+    const btnHow = document.getElementById("btnHow");
+    const btnRestart = document.getElementById("btnRestart");
+    const btnQuit = document.getElementById("btnQuit");
+    const how = document.getElementById("how");
+    const upgradeGrid = document.getElementById("upgradeGrid");
+    const summary = document.getElementById("summary");
+
+    btnStart.addEventListener("click", startGame);
+    btnHow.addEventListener("click", () => { how.style.display = how.style.display === "none" ? "block" : "none"; });
+    btnRestart.addEventListener("click", () => { overOverlay.style.display = "none"; startGame(); });
+    btnQuit.addEventListener("click", () => { overOverlay.style.display = "none"; startOverlay.style.display = "grid"; });
+
+    // Input: keyboard + joystick
+    const keys = new Set();
+    window.addEventListener("keydown", (e) => {
+      if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
+      keys.add(e.key.toLowerCase());
+    });
+    window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+
+    // Joystick
+    const joy = {
+      el: document.getElementById("joystick"),
+      base: document.getElementById("joy-base"),
+      stick: document.getElementById("joy-stick"),
+      active: false, origin: { x: 0, y: 0 }, vec: { x: 0, y: 0 }, r: 70
+    };
+    function joySetStick(x, y) { joy.stick.style.left = x + "px"; joy.stick.style.top = y + "px"; }
+    function joyCenter() { const rect = joy.el.getBoundingClientRect(); joy.origin.x = rect.width/2; joy.origin.y = rect.height/2; joySetStick(joy.origin.x, joy.origin.y); }
+    joyCenter(); window.addEventListener("resize", joyCenter);
+    function joyPointer(e, type) {
+      const rect = joy.el.getBoundingClientRect();
+      const px = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const py = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+      if (type === "start") joy.active = true;
+      if (type === "end") { joy.active = false; joy.vec.x = 0; joy.vec.y = 0; joySetStick(joy.origin.x, joy.origin.y); return; }
+      if (!joy.active) return;
+      const dx = px - joy.origin.x, dy = py - joy.origin.y;
+      const len = Math.hypot(dx, dy); const max = joy.r;
+      const ux = len ? dx/len : 0, uy = len ? dy/len : 0;
+      const mag = Math.min(len, max);
+      joy.vec.x = (mag / max) * ux; joy.vec.y = (mag / max) * uy;
+      joySetStick(joy.origin.x + ux * mag, joy.origin.y + uy * mag);
+    }
+    ["pointerdown","pointermove","pointerup","pointercancel"].forEach(type => {
+      joy.el.addEventListener(type, (e) => { e.preventDefault();
+        if (type === "pointerdown") joyPointer(e, "start");
+        else if (type === "pointermove") joyPointer(e, "move");
+        else joyPointer(e, "end");
+      }, { passive: false });
+    });
+
+    // Utilities
+    const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+    const rand = (a,b)=>a+Math.random()*(b-a);
+    const irand = (a,b)=>Math.floor(rand(a,b+1));
+    const dist2 = (x1,y1,x2,y2)=>{ const dx=x2-x1, dy=y2-y1; return dx*dx+dy*dy; };
+    const nowSec = ()=>performance.now()/1000;
+
+    // Sprite loading: map + enemies, with auto background cleanup (corner chroma-key)
+    function prepareSprite(img) {
+      // Draw to offscreen and remove a uniform corner background if present (e.g., solid black)
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const off = document.createElement("canvas"); off.width = w; off.height = h;
+      const oc = off.getContext("2d", { willReadFrequently: true });
+      oc.imageSmoothingEnabled = false;
+      oc.clearRect(0,0,w,h);
+      oc.globalCompositeOperation = "source-over";
+      oc.drawImage(img, 0, 0);
+      try {
+        const data = oc.getImageData(0,0,w,h);
+        const px = data.data;
+        const c0 = sample(px, w, h, 0, 0);
+        const c1 = sample(px, w, h, w-1, 0);
+        const c2 = sample(px, w, h, 0, h-1);
+        const c3 = sample(px, w, h, w-1, h-1);
+        const uniform = similar(c0,c1) && similar(c0,c2) && similar(c0,c3);
+        const darkish = c0.r < 20 && c0.g < 20 && c0.b < 20 && c0.a > 200;
+        if (uniform && darkish) {
+          const thr = 18;
+          for (let i=0; i<px.length; i+=4) {
+            const r=px[i], g=px[i+1], b=px[i+2], a=px[i+3];
+            if (a>0 && Math.abs(r-c0.r)<=thr && Math.abs(g-c0.g)<=thr && Math.abs(b-c0.b)<=thr) {
+              px[i+3] = 0;
+            }
+          }
+          oc.putImageData(data, 0, 0);
+        }
+      } catch(e) { /* ignore CORS-tainted cases */ }
+      return off;
+      function sample(px,w,h,x,y){ const i=(y*w+x)*4; return {r:px[i],g:px[i+1],b:px[i+2],a:px[i+3]}; }
+      function similar(a,b){ return Math.abs(a.r-b.r)<4 && Math.abs(a.g-b.g)<4 && Math.abs(a.b-b.b)<4 && Math.abs(a.a-b.a)<4; }
+    }
+
+    // Map
+    const MAP = { img: new Image(), ready: false, canvas: null, w: 1920, h: 1080 };
+    MAP.img.crossOrigin = "anonymous";
+    MAP.img.onload = () => {
+      MAP.canvas = prepareSprite(MAP.img);
+      MAP.w = MAP.canvas.width; MAP.h = MAP.canvas.height;
+      MAP.ready = true;
+      // Adapt world size to map
+      WORLD_W = MAP.w; WORLD_H = MAP.h;
+      // If a game is running, expand arena bounds dynamically
+      if (game) game.arena = { w: WORLD_W, h: WORLD_H, padding: 24 };
+    };
+    MAP.img.src = ASSET_PATH + "map.png"; // place map.png next to index.html (or in ASSET_PATH)
+
+    // Enemies 1..10
+    const SPRITES = [];
+    function loadSprites() {
+      for (let i=1; i<=10; i++) {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.decoding = "async";
+        img.src = ASSET_PATH + `enemy${i}.png`;
+        const entry = { img, ready: false, canvas: null, w: 0, h: 0 };
+        img.onload = () => {
+          entry.canvas = prepareSprite(img);
+          entry.w = entry.canvas.width; entry.h = entry.canvas.height;
+          entry.ready = true;
+        };
+        img.onerror = () => { console.warn(`Failed to load ${img.src}`); };
+        SPRITES[i] = entry;
+      }
+    }
+    loadSprites();
+
+    // Game state
+    let game, lastTime, running=false;
+
+    function defaultGame(){
+      return {
+        t0: nowSec(), time: 0,
+        player: {
+          x: WORLD_W/2, y: WORLD_H/2, r: 12, speed: 190,
+          hp: 120, maxHp: 120, regenRate: 0, regenTimer: 0,
+          dmg: 6, fireRate: 3.2, cooldown: 0, bulletSpeed: 460, bulletSize: 4, pierce: 0, projectiles: 1,
+          pickup: 140, xp: 0, level: 1, xpToNext: 24, invuln: 0
+        },
+        enemies: [], bullets: [], gems: [],
+        dmgTexts: [], // floating damage numbers
+        kills: 0,
+        spawnRate: 0.7,    // continuous flow
+        spawnAccum: 0,
+        difficulty: 1,
+        pausedForUpgrade: false, over: false,
+        arena: { w: WORLD_W, h: WORLD_H, padding: 24 }
+      };
+    }
+
+    function startGame(){
+      game = defaultGame();
+      startOverlay.style.display = "none";
+      upgradesOverlay.style.display = "none";
+      overOverlay.style.display = "none";
+      running = true;
+      lastTime = performance.now();
+      requestAnimationFrame(loop);
+    }
+
+    function xpNeededFor(level){ return Math.floor(24 * Math.pow(1.18, Math.max(0, level-1))); }
+
+    // Enemy definitions (10 sprites) with level gating and weights
+    const ENEMY_DEFS = [
+      null, // 0 unused (index 1-10)
+      { id:1, minLevel:1,  base:{hp:24, spd:85,  touch:2, value:6},  scale:1.0, weight:4 },
+      { id:2, minLevel:1,  base:{hp:26, spd:75,  touch:2, value:6},  scale:1.0, weight:3 },
+      { id:3, minLevel:2,  base:{hp:32, spd:95,  touch:3, value:8},  scale:1.1, weight:3 },
+      { id:4, minLevel:3,  base:{hp:40, spd:80,  touch:3, value:9},  scale:1.2, weight:3 },
+      { id:5, minLevel:4,  base:{hp:30, spd:120, touch:3, value:10}, scale:0.95, weight:2 },
+      { id:6, minLevel:5,  base:{hp:55, spd:70,  touch:4, value:12}, scale:1.25, weight:2 },
+      { id:7, minLevel:6,  base:{hp:48, spd:100, touch:4, value:12}, scale:1.1, weight:2 },
+      { id:8, minLevel:7,  base:{hp:62, spd:90,  touch:5, value:14}, scale:1.2, weight:2 },
+      { id:9, minLevel:8,  base:{hp:80, spd:80,  touch:6, value:16}, scale:1.3, weight:1 },
+      { id:10,minLevel:10, base:{hp:120,spd:70,  touch:8, value:20}, scale:1.4, weight:1 }
+    ];
+    function enemyCap(level){ return 18 + Math.floor(level*7); }
+    function availableTypes(level){
+      const out=[]; for(let i=1;i<=10;i++){ if (ENEMY_DEFS[i].minLevel <= level) out.push(ENEMY_DEFS[i]); } return out;
+    }
+    function pickType(types){
+      const total = types.reduce((s,t)=>s+t.weight,0);
+      let r=Math.random()*total;
+      for(const t of types){ if ((r-=t.weight)<=0) return t; }
+      return types[0];
+    }
+
+    // Spawning near camera edges
+    function trySpawn(dt){
+      const g=game, p=g.player;
+      g.spawnAccum += dt;
+      const level = p.level;
+      const cap = enemyCap(level);
+      if (g.enemies.length >= cap) { g.spawnAccum = 0; return; }
+      const interval = g.spawnRate;
+      while (g.spawnAccum >= interval && g.enemies.length < cap){
+        spawnEnemy(level);
+        g.spawnAccum -= interval;
+      }
+    }
+    function spawnEnemy(level){
+      const types = availableTypes(level);
+      const def = pickType(types);
+      const margin = 40;
+      const view = { x: camera.x, y: camera.y, w: BASE_W, h: BASE_H };
+      const side = ["top","right","bottom","left"][irand(0,3)];
+      let x,y;
+      if (side==="top")    { x = rand(view.x - margin, view.x + view.w + margin); y = view.y - margin; }
+      if (side==="bottom") { x = rand(view.x - margin, view.x + view.w + margin); y = view.y + view.h + margin; }
+      if (side==="left")   { x = view.x - margin; y = rand(view.y - margin, view.y + view.h + margin); }
+      if (side==="right")  { x = view.x + view.w + margin; y = rand(view.y - margin, view.y + view.h + margin); }
+      x = clamp(x, 0, WORLD_W); y = clamp(y, 0, WORLD_H);
+
+      const dScale = 1 + (game.time*0.03);
+      const E = {
+        typeId: def.id,
+        x, y,
+        r: 12*def.scale,
+        hp: Math.floor(def.base.hp * dScale),
+        speed: def.base.spd + game.time*0.5,
+        touch: def.base.touch,
+        value: def.base.value,
+        anim: { t: 0 }
+      };
+      game.enemies.push(E);
+    }
+
+    // Upgrades
+    const UPGRADE_POOL = [
+      { id:"dmg", name:"Sharpened Rounds", desc:"+2 bullet damage", apply: p=>p.dmg+=2 },
+      { id:"firerate", name:"Rapid Fire", desc:"+20% fire rate", apply: p=>p.fireRate*=1.20 },
+      { id:"move", name:"Agility", desc:"+15% move speed", apply: p=>p.speed*=1.15 },
+      { id:"projectiles", name:"Split Shot", desc:"+1 projectile", apply: p=>p.projectiles+=1 },
+      { id:"pierce", name:"Piercing Shots", desc:"Bullets pierce +1", apply: p=>p.pierce+=1 },
+      { id:"pickup", name:"Magnet", desc:"+60 pickup radius", apply: p=>p.pickup+=60 },
+      { id:"hp", name:"Fortitude", desc:"Max HP +20 and heal 10", apply: p=>{ p.maxHp+=20; p.hp = Math.min(p.maxHp, p.hp+10);} },
+      { id:"bulletspd", name:"Propellant", desc:"+20% bullet speed", apply: p=>p.bulletSpeed*=1.2 },
+      { id:"regen", name:"Regen", desc:"Regenerate 1 HP every 10s", apply: p=>{ p.regenRate = Math.max(p.regenRate, 1/10);} },
+      { id:"size", name:"Heftier Rounds", desc:"Bullet size +1", apply: p=>p.bulletSize+=1 }
+    ];
+    function chooseUpgrades(n=3){ const picks=[], pool=[...UPGRADE_POOL]; for(let i=0;i<n&&pool.length;i++){ const idx=irand(0,pool.length-1); picks.push(pool[idx]); pool.splice(idx,1);} return picks; }
+    function showUpgradeChoices(g){
+      g.pausedForUpgrade = true; upgradesOverlay.style.display="grid"; upgradeGrid.innerHTML="";
+      chooseUpgrades(3).forEach(up=>{ const b=document.createElement("button"); b.className="upgrade"; b.innerHTML=`<div style="font-weight:800">${up.name}</div><small>${up.desc}</small>`;
+        b.addEventListener("click", ()=>{ up.apply(g.player); upgradesOverlay.style.display="none"; g.pausedForUpgrade=false; }); upgradeGrid.appendChild(b);
+      });
+    }
+
+    // Shooting
+    function shoot(g){
+      const p=g.player; if (g.enemies.length===0) return;
+      let nearest=null, best=Infinity;
+      for(const e of g.enemies){ const d2=dist2(p.x,p.y,e.x,e.y); if (d2<best){ best=d2; nearest=e; } }
+      if(!nearest) return;
+      const dx=nearest.x-p.x, dy=nearest.y-p.y, len=Math.hypot(dx,dy)||1; const ux=dx/len, uy=dy/len;
+      const spread=Math.min(0.35, 0.08*(p.projectiles-1)); const count=p.projectiles; const angleBase=Math.atan2(uy,ux);
+      for(let i=0;i<count;i++){
+        const t = count===1 ? 0 : (i/(count-1)-0.5);
+        const theta = angleBase + spread*(t*2);
+        game.bullets.push({ x:p.x+ux*(p.r+6), y:p.y+uy*(p.r+6), vx:Math.cos(theta)*p.bulletSpeed, vy:Math.sin(theta)*p.bulletSpeed, r:p.bulletSize, dmg:p.dmg, life:1.5, pierce:p.pierce });
+      }
+    }
+
+    // Loop
+    function loop(ts){
+      if(!running) return;
+      const dt = Math.min(0.033,(ts-lastTime)/1000); lastTime=ts;
+      update(dt); draw();
+      if(running) requestAnimationFrame(loop);
+    }
+
+    function update(dt){
+      const g=game; if (!g || g.over) return;
+      if (!g.pausedForUpgrade){
+        g.time = nowSec() - g.t0;
+        g.difficulty = 1 + g.time*0.2;
+
+        // Move player (keys + joystick)
+        const p=g.player;
+        let mx=0,my=0;
+        if (keys.has("w")||keys.has("arrowup")) my-=1;
+        if (keys.has("s")||keys.has("arrowdown")) my+=1;
+        if (keys.has("a")||keys.has("arrowleft")) mx-=1;
+        if (keys.has("d")||keys.has("arrowright")) mx+=1;
+        mx += joy.vec.x; my += joy.vec.y;
+        if (mx!==0||my!==0){ const len=Math.hypot(mx,my)||1; mx/=len; my/=len; p.x+=mx*p.speed*dt; p.y+=my*p.speed*dt; }
+
+        // Clamp to world
+        p.x=clamp(p.x,g.arena.padding,WORLD_W-g.arena.padding);
+        p.y=clamp(p.y,g.arena.padding,WORLD_H-g.arena.padding);
+
+        // Camera follow
+        camera.x = clamp(p.x - BASE_W/2, 0, WORLD_W-BASE_W);
+        camera.y = clamp(p.y - BASE_H/2, 0, WORLD_H-BASE_H);
+
+        // Regen + shoot
+        if (p.regenRate>0){ p.regenTimer+=dt; if (p.regenTimer >= (1/p.regenRate)){ p.regenTimer=0; p.hp=Math.min(p.maxHp, p.hp+1); } }
+        p.cooldown -= dt; if (p.cooldown<=0){ shoot(g); p.cooldown = 1/p.fireRate; }
+
+        // Bullets
+        for (let i=g.bullets.length-1;i>=0;i--){
+          const b=g.bullets[i]; b.x+=b.vx*dt; b.y+=b.vy*dt; b.life-=dt;
+          if (b.life<=0 || b.x<-40 || b.x>WORLD_W+40 || b.y<-40 || b.y>WORLD_H+40) g.bullets.splice(i,1);
+        }
+
+        // Spawning continuous with cap
+        trySpawn(dt);
+
+        // Enemies move to player + collide
+        for (let i=g.enemies.length-1;i>=0;i--){
+          const e=g.enemies[i];
+          const dx=p.x-e.x, dy=p.y-e.y, len=Math.hypot(dx,dy)||1, ux=dx/len, uy=dy/len;
+          e.x += ux*e.speed*dt; e.y += uy*e.speed*dt;
+          e.anim.t += dt*(0.6 + e.speed/140);
+          const rSum = e.r + p.r;
+          if (dist2(e.x,e.y,p.x,p.y) < rSum*rSum){
+            if (p.invuln<=0){
+              p.hp -= e.touch; p.invuln = 0.7;
+              if (p.hp<=0){ p.hp=0; endGame(); break; }
+            }
+          }
+        }
+
+        // Player i-frames
+        g.player.invuln = Math.max(0, g.player.invuln - dt);
+
+        // Bullet vs enemy (also spawn damage text)
+        for (let i=g.bullets.length-1;i>=0;i--){
+          const b=g.bullets[i];
+          for (let j=g.enemies.length-1;j>=0;j--){
+            const e=g.enemies[j]; const rSum=b.r+e.r;
+            if (dist2(b.x,b.y,e.x,e.y)<=rSum*rSum){
+              e.hp -= b.dmg;
+
+              // Damage text
+              const jitter = rand(-4,4);
+              g.dmgTexts.push({
+                x: e.x + jitter,
+                y: e.y - e.r - 10,
+                val: b.dmg,
+                life: 0.8, // seconds
+                vy: -28,   // pixels per second upward
+                color: "#ffe08a"
+              });
+
+              if (e.hp<=0){
+                g.kills++;
+                g.gems.push({ x:e.x, y:e.y, r:5, value:e.value, vx:rand(-20,20), vy:rand(-20,20), homing:false });
+                g.enemies.splice(j,1);
+              }
+              if (b.pierce>0){ b.pierce--; b.x+=b.vx*0.01; b.y+=b.vy*0.01; } else { g.bullets.splice(i,1); break; }
+            }
+          }
+        }
+
+        // Gems: latch homing forever once triggered
+        for (let i=g.gems.length-1;i>=0;i--){
+          const gem=g.gems[i]; gem.vx*=0.96; gem.vy*=0.96;
+          if (!gem.homing){
+            const d2p=dist2(gem.x,gem.y,p.x,p.y);
+            if (d2p < (p.pickup*p.pickup)) gem.homing=true;
+          }
+          if (gem.homing){
+            const dx=p.x-gem.x, dy=p.y-gem.y, len=Math.hypot(dx,dy)||1, ux=dx/len, uy=dy/len;
+            gem.vx += ux*900*dt; gem.vy += uy*900*dt;
+            const sp=Math.hypot(gem.vx,gem.vy), maxSp=500; if (sp>maxSp){ gem.vx*=maxSp/sp; gem.vy*=maxSp/sp; }
+          }
+          gem.x+=gem.vx*dt; gem.y+=gem.vy*dt;
+          if (dist2(gem.x,gem.y,p.x,p.y) < (gem.r+p.r)*(gem.r+p.r)){ grantXP(g, gem.value); g.gems.splice(i,1); }
+          gem.x = clamp(gem.x, 6, WORLD_W-6); gem.y = clamp(gem.y, 6, WORLD_H-6);
+        }
+
+        // Damage texts update
+        for (let i=g.dmgTexts.length-1; i>=0; i--) {
+          const d = g.dmgTexts[i];
+          d.y += d.vy * dt;
+          d.life -= dt;
+          d.vy -= 8 * dt; // slight acceleration upward
+          if (d.life <= 0) g.dmgTexts.splice(i,1);
+        }
+      }
+      updateHUD();
+    }
+
+    function grantXP(g, amt){
+      const p=g.player; p.xp += amt;
+      while (p.xp >= p.xpToNext){
+        p.xp -= p.xpToNext; p.level++; p.xpToNext = xpNeededFor(p.level);
+        showUpgradeChoices(g);
+      }
+    }
+
+    function updateHUD(){
+      const g=game, p=g.player;
+      const t=Math.floor(g.time), mm=String(Math.floor(t/60)).padStart(2,"0"), ss=String(t%60).padStart(2,"0");
+      elTime.textContent = `${mm}:${ss}`;
+      elLevel.textContent = `Lv ${p.level}`;
+      elKills.textContent = `Kills ${g.kills}`;
+      elXPFill.style.width = (clamp(p.xp/p.xpToNext,0,1)*100).toFixed(1)+"%";
+      const hpFill = clamp(p.hp/p.maxHp,0,1);
+      elHealthFill.style.width = (hpFill*100).toFixed(1)+"%";
+      elHealthLabel.textContent = `Health (${p.hp}/${p.maxHp})`;
+    }
+
+    function endGame(){
+      const g=game; g.over=true; running=false;
+      summary.textContent = `You survived ${elTime.textContent}, reached level ${g.player.level}, and defeated ${g.kills} enemies.`;
+      overOverlay.style.display = "grid";
+    }
+
+    // Rendering
+    function draw(){
+      const g=game; if(!g) return;
+      ctx.clearRect(0,0,BASE_W,BASE_H);
+      ctx.save();
+      ctx.translate(-camera.x, -camera.y);
+
+      drawWorld();      // map
+
+      // Gems
+      for (const gem of g.gems) drawGem(gem);
+      // Bullets
+      for (const b of g.bullets) drawBullet(b);
+      // Enemies
+      for (const e of g.enemies) drawEnemySprite(e);
+      // Damage texts
+      drawDamageTexts(g.dmgTexts);
+      // Player
+      drawPlayer(g.player);
+
+      ctx.restore();
+    }
+
+    // World draw: imported map or simple fallback
+    function drawWorld(){
+      if (MAP.ready) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(MAP.canvas, 0, 0, MAP.w, MAP.h);
+      } else {
+        // Fallback (simple grass)
+        ctx.fillStyle = "#2b5d2b";
+        ctx.fillRect(camera.x, camera.y, BASE_W, BASE_H);
+      }
+    }
+
+    // Player/enemy/gems/bullets
+    function drawPlayer(p){
+      ctx.save();
+      // Shadow
+      ctx.fillStyle="rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.ellipse(p.x, p.y + p.r*0.6, p.r*1.1, p.r*0.55, 0, 0, Math.PI*2); ctx.fill();
+      // Flash when invuln
+      const flicker = p.invuln>0 ? (Math.sin(performance.now()/50)>0?1:0.6) : 1; ctx.globalAlpha=flicker;
+      // Body
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      const grd=ctx.createRadialGradient(p.x-3,p.y-4,4, p.x,p.y,p.r+4); grd.addColorStop(0,"#9be7ff"); grd.addColorStop(1,"#2ea5ff");
+      ctx.fillStyle=grd; ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle="rgba(255,255,255,0.6)"; ctx.stroke();
+      // Eye
+      ctx.beginPath(); ctx.arc(p.x+4, p.y-3, 2, 0, Math.PI*2); ctx.fillStyle="#fff"; ctx.fill();
+      ctx.restore();
+    }
+
+    function drawEnemySprite(e){
+      ctx.save();
+      // Shadow
+      ctx.fillStyle="rgba(0,0,0,0.30)";
+      ctx.beginPath(); ctx.ellipse(e.x, e.y + e.r*0.7, e.r*1.1, e.r*0.5, 0, 0, Math.PI*2); ctx.fill();
+
+      const s = SPRITES[e.typeId];
+      if (s && s.ready && s.canvas){
+        const scale = (e.r*2) / Math.max(1, Math.max(s.w, s.h)); // fit by max dimension
+        const dw = s.w * scale, dh = s.h * scale;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(s.canvas, e.x - dw/2, e.y - dh/2, dw, dh);
+      } else {
+        // fallback placeholder while image loads
+        ctx.fillStyle="#ff6b6b"; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.fill();
+      }
+
+      // Small HP bar
+      ctx.fillStyle="rgba(0,0,0,0.55)"; ctx.fillRect(e.x - e.r, e.y - e.r - 8, e.r*2, 4);
+      const w = clamp(e.hp / 80, 0, 1) * e.r*2; ctx.fillStyle="#ff6b6b"; ctx.fillRect(e.x - e.r, e.y - e.r - 8, w, 4);
+
+      ctx.restore();
+    }
+
+    function drawBullet(b){
+      ctx.save();
+      ctx.strokeStyle="rgba(100,210,255,0.5)"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(b.x - b.vx*0.03, b.y - b.vy*0.03); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.fillStyle="#a1f7ff"; ctx.shadowColor="#64d2ff"; ctx.shadowBlur=8; ctx.fill(); ctx.restore();
+    }
+
+    function drawGem(gem){
+      ctx.save(); ctx.beginPath(); ctx.arc(gem.x, gem.y, gem.r, 0, Math.PI*2); ctx.fillStyle="#5adfb2"; ctx.shadowColor="#5adfb2"; ctx.shadowBlur=10; ctx.fill(); ctx.restore();
+    }
+
+    function drawDamageTexts(arr){
+      ctx.save();
+      for (const d of arr) {
+        const alpha = Math.max(0, d.life / 0.8);
+        ctx.globalAlpha = alpha;
+        ctx.font = "bold 16px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        // outline for readability
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillText(String(d.val), d.x + 1, d.y + 1);
+        ctx.fillStyle = d.color;
+        ctx.fillText(String(d.val), d.x, d.y);
+      }
+      ctx.restore();
+    }
+
+    // Show start on load
+    document.getElementById("start").style.display = "grid";
+  </script>
+</body>
+</html>
