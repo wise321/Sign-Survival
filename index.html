@@ -46,8 +46,11 @@
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
       padding: 8px 12px; border-radius: 999px;
     }
-    /* Health bar */
-    #healthWrap { position: fixed; top: 44px; left: 12px; width: 280px; z-index: 5; }
+    /* Health bar (we'll position it with JS relative to canvas) */
+    #healthWrap {
+      position: fixed; z-index: 5;
+      width: 260px;
+    }
     #healthLabel { font-size: 12px; color: var(--text-dim); margin: 0 0 6px 6px; text-shadow: 0 1px 0 #0004; }
     #healthBar { width: 100%; height: 14px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; overflow: hidden; }
     #healthFill { height: 100%; width: 100%; background: linear-gradient(90deg, #3bd16f, #23b45b); transition: width 0.15s ease-out; }
@@ -91,6 +94,7 @@
     /* Joystick */
     #joystick {
       position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; width: 180px; height: 180px; z-index: 6; touch-action: none;
+      display: none; /* show via JS only on touch devices */
     }
     #joy-base {
       position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
@@ -120,12 +124,13 @@
 
   <div id="xpbar"><div id="xpfill"></div></div>
 
+  <!-- This health bar is positioned to the canvas' upper-right via JS -->
   <div id="healthWrap">
     <div id="healthLabel">Health</div>
     <div id="healthBar"><div id="healthFill"></div></div>
   </div>
 
-  <!-- Touch joystick -->
+  <!-- Touch joystick (shown only on touch devices) -->
   <div id="joystick">
     <div id="joy-base"></div>
     <div id="joy-stick"></div>
@@ -141,9 +146,9 @@
       </div>
       <div id="how" class="subtitle" style="display:none;margin-top:12px">
         - Move with joystick (touch) or WASD/Arrows.<br/>
-        - Auto-shoots up to N different targets (Split Shot). XP orbs latch and keep homing.<br/>
-        - Enemies space out and circle; contact damages you per-enemy type.<br/>
-        - Use transparent PNGs. The loader will auto-remove a solid black matte if detected.
+        - Auto-shoots up to N different targets (Split Shot). XP orbs accelerate faster now.<br/>
+        - Enemies space out and orbit; contact deals type-based damage (2,4,6,...).<br/>
+        - Low chance health pickups spawn on the map. Use transparent PNGs.
       </div>
     </div>
   </div>
@@ -189,6 +194,7 @@
       const scale = Math.min(availW / BASE_W, availH / BASE_H);
       canvas.style.width = (BASE_W * scale) + "px";
       canvas.style.height = (BASE_H * scale) + "px";
+      positionHealthBar();
     }
     window.addEventListener("resize", fitCanvas);
     fitCanvas();
@@ -230,7 +236,8 @@
     });
     window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 
-    // Joystick
+    // Touch detection and joystick attach only on touch devices
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     const joy = {
       el: document.getElementById("joystick"),
       base: document.getElementById("joy-base"),
@@ -239,28 +246,35 @@
     };
     function joySetStick(x, y) { joy.stick.style.left = x + "px"; joy.stick.style.top = y + "px"; }
     function joyCenter() { const rect = joy.el.getBoundingClientRect(); joy.origin.x = rect.width/2; joy.origin.y = rect.height/2; joySetStick(joy.origin.x, joy.origin.y); }
-    joyCenter(); window.addEventListener("resize", joyCenter);
-    function joyPointer(e, type) {
-      const rect = joy.el.getBoundingClientRect();
-      const px = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-      const py = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-      if (type === "start") joy.active = true;
-      if (type === "end") { joy.active = false; joy.vec.x = 0; joy.vec.y = 0; joySetStick(joy.origin.x, joy.origin.y); return; }
-      if (!joy.active) return;
-      const dx = px - joy.origin.x, dy = py - joy.origin.y;
-      const len = Math.hypot(dx, dy); const max = joy.r;
-      const ux = len ? dx/len : 0, uy = len ? dy/len : 0;
-      const mag = Math.min(len, max);
-      joy.vec.x = (mag / max) * ux; joy.vec.y = (mag / max) * uy;
-      joySetStick(joy.origin.x + ux * mag, joy.origin.y + uy * mag);
+
+    if (isTouch) {
+      joy.el.style.display = "block";
+      joyCenter(); window.addEventListener("resize", joyCenter);
+      function joyPointer(e, type) {
+        const rect = joy.el.getBoundingClientRect();
+        const px = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        const py = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+        if (type === "start") joy.active = true;
+        if (type === "end") { joy.active = false; joy.vec.x = 0; joy.vec.y = 0; joySetStick(joy.origin.x, joy.origin.y); return; }
+        if (!joy.active) return;
+        const dx = px - joy.origin.x, dy = py - joy.origin.y;
+        const len = Math.hypot(dx, dy); const max = joy.r;
+        const ux = len ? dx/len : 0, uy = len ? dy/len : 0;
+        const mag = Math.min(len, max);
+        joy.vec.x = (mag / max) * ux; joy.vec.y = (mag / max) * uy;
+        joySetStick(joy.origin.x + ux * mag, joy.origin.y + uy * mag);
+      }
+      ["pointerdown","pointermove","pointerup","pointercancel"].forEach(type => {
+        joy.el.addEventListener(type, (e) => { e.preventDefault();
+          if (type === "pointerdown") joyPointer(e, "start");
+          else if (type === "pointermove") joyPointer(e, "move");
+          else joyPointer(e, "end");
+        }, { passive: false });
+      });
+    } else {
+      // ensure no joystick movement on desktop
+      joy.vec.x = 0; joy.vec.y = 0; joy.el.style.display = "none";
     }
-    ["pointerdown","pointermove","pointerup","pointercancel"].forEach(type => {
-      joy.el.addEventListener(type, (e) => { e.preventDefault();
-        if (type === "pointerdown") joyPointer(e, "start");
-        else if (type === "pointermove") joyPointer(e, "move");
-        else joyPointer(e, "end");
-      }, { passive: false });
-    });
 
     // Utilities
     const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
@@ -268,6 +282,17 @@
     const irand = (a,b)=>Math.floor(rand(a,b+1));
     const dist2 = (x1,y1,x2,y2)=>{ const dx=x2-x1, dy=y2-y1; return dx*dx+dy*dy; };
     const nowSec = ()=>performance.now()/1000;
+
+    // Position the health bar inside the canvas' upper-right
+    function positionHealthBar(){
+      const wrap = document.getElementById("healthWrap");
+      const rect = canvas.getBoundingClientRect();
+      const margin = 10;
+      const width = Math.min(280, Math.max(180, rect.width * 0.3));
+      wrap.style.width = width + "px";
+      wrap.style.left = (rect.left + rect.width - width - margin) + "px";
+      wrap.style.top = (rect.top + margin) + "px";
+    }
 
     // Sprite loading: map + enemies, with auto background cleanup (corner chroma-key)
     function prepareSprite(img) {
@@ -310,28 +335,36 @@
       MAP.canvas = prepareSprite(MAP.img);
       MAP.w = MAP.canvas.width; MAP.h = MAP.canvas.height;
       MAP.ready = true;
-      // Adapt world size to map
       WORLD_W = MAP.w; WORLD_H = MAP.h;
       if (game) game.arena = { w: WORLD_W, h: WORLD_H, padding: 24 };
     };
     MAP.img.src = ASSET_PATH + "map.png"; // background image name
 
-    // Enemies 1..10
+    // Enemy sprites with filename fallbacks (enemyN, enemyN.png, enemN, enemN.png, webp)
     const SPRITES = [];
+    function loadWithFallback(id, variants){
+      const entry = { img:null, ready:false, canvas:null, w:0, h:0 };
+      let idx = 0;
+      function tryNext(){
+        if (idx >= variants.length) { console.warn("All fallbacks failed for enemy", id); return; }
+        const src = variants[idx++];
+        const img = new Image(); img.crossOrigin = "anonymous"; img.decoding = "async";
+        img.onload = () => { entry.canvas = prepareSprite(img); entry.w = entry.canvas.width; entry.h = entry.canvas.height; entry.ready = true; };
+        img.onerror = tryNext;
+        img.src = src;
+        entry.img = img;
+      }
+      tryNext();
+      SPRITES[id] = entry;
+    }
     function loadSprites() {
       for (let i=1; i<=10; i++) {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.decoding = "async";
-        img.src = ASSET_PATH + `enemy${i}.png`;
-        const entry = { img, ready: false, canvas: null, w: 0, h: 0 };
-        img.onload = () => {
-          entry.canvas = prepareSprite(img);
-          entry.w = entry.canvas.width; entry.h = entry.canvas.height;
-          entry.ready = true;
-        };
-        img.onerror = () => { console.warn(`Failed to load ${img.src}`); };
-        SPRITES[i] = entry;
+        const nameEnemy = ASSET_PATH + `enemy${i}`;
+        const nameTypo  = ASSET_PATH + `enem${i}`; // support "enem3"
+        loadWithFallback(i, [
+          `${nameEnemy}.png`, `${nameEnemy}.webp`, nameEnemy,
+          `${nameTypo}.png`, `${nameTypo}.webp`, nameTypo
+        ]);
       }
     }
     loadSprites();
@@ -345,15 +378,15 @@
         player: {
           x: WORLD_W/2, y: WORLD_H/2, r: 12, speed: 190,
           hp: 120, maxHp: 120, regenRate: 0, regenTimer: 0,
-          dmg: 6, fireRate: 3.0, cooldown: 0, projectiles: 1,
-          pickup: 140, xp: 0, level: 1, xpToNext: 60, // will be overwritten below
+          dmg: 10, fireRate: 3.0, cooldown: 0, projectiles: 1,
+          pickup: 160, xp: 0, level: 1, xpToNext: 60
         },
-        enemies: [], bullets: [], gems: [],
+        enemies: [], bullets: [], gems: [], healthPacks: [],
         dmgTexts: [],
         kills: 0,
         spawnRate: 0.8,
         spawnAccum: 0,
-        difficulty: 1,
+        healthSpawnAccum: 0,
         pausedForUpgrade: false, over: false,
         arena: { w: WORLD_W, h: WORLD_H, padding: 24 }
       };
@@ -370,9 +403,8 @@
       requestAnimationFrame(loop);
     }
 
-    // Slower leveling: more kills needed
+    // Slower leveling
     function xpNeededFor(level){
-      // start 60, then scale up ~35% per level
       return Math.floor(60 * Math.pow(1.35, Math.max(0, level - 1)));
     }
 
@@ -401,13 +433,13 @@
       return types[0];
     }
 
-    // Spawning near camera edges
+    // Spawning
     function trySpawn(dt){
       const g=game, p=g.player;
       g.spawnAccum += dt;
       const level = p.level;
       const cap = enemyCap(level);
-      if (g.enemies.length >= cap) { g.spawnAccum = Math.min(g.spawnAccum, g.spawnRate); return; }
+      if (g.enemies.length >= cap) { g.spawnAccum = Math.min(g.spawnAccum, g.spawnRate); }
       const interval = g.spawnRate;
       while (g.spawnAccum >= interval && g.enemies.length < cap){
         spawnEnemy(level);
@@ -428,7 +460,7 @@
       x = clamp(x, 0, WORLD_W); y = clamp(y, 0, WORLD_H);
 
       const dScale = 1 + (game.time*0.03);
-      const maxSpeed = 145; // cap so you can always outrun eventually
+      const maxSpeed = 140;
       const typeId = def.id;
       const E = {
         typeId,
@@ -438,22 +470,26 @@
         maxHp: Math.floor(def.base.hp * dScale),
         speed: Math.min(def.base.spd * (1 + game.time*0.02), maxSpeed),
         value: def.base.value,
-        touch: typeId * 2,        // 2,4,6,...
-        anim: { t: 0 },
-        hitCD: 0                  // per-enemy contact cooldown
+        touch: typeId * 2,
+        vx: 0, vy: 0,
+        angle: Math.random()*Math.PI*2,
+        turn: rand(-0.6,0.6),
+        orbitR: 80 + rand(-15,20),
+        hitCD: 0
       };
       game.enemies.push(E);
     }
 
-    // Upgrades (removed Piercing / Bullet Speed / Bullet Size)
+    // Upgrades (kept clean; added a pure Max HP passive)
     const UPGRADE_POOL = [
-      { id:"dmg",       name:"Sharpened Rounds", desc:"+2 bullet damage", apply: p=>p.dmg+=2 },
-      { id:"firerate",  name:"Rapid Fire",       desc:"+20% fire rate",  apply: p=>p.fireRate*=1.20 },
-      { id:"move",      name:"Agility",          desc:"+15% move speed", apply: p=>p.speed*=1.15 },
-      { id:"projectiles", name:"Split Shot",     desc:"Fires at +1 additional enemy (max 10)", apply: p=>{ p.projectiles = Math.min(10, p.projectiles+1); } },
-      { id:"pickup",    name:"Magnet",           desc:"+60 pickup radius", apply: p=>p.pickup+=60 },
-      { id:"hp",        name:"Fortitude",        desc:"Max HP +20 and heal 10", apply: p=>{ p.maxHp+=20; p.hp = Math.min(p.maxHp, p.hp+10);} },
-      { id:"regen",     name:"Regen",            desc:"Regenerate 1 HP every 10s", apply: p=>{ p.regenRate = Math.max(p.regenRate, 1/10);} },
+      { id:"dmg",         name:"Sharpened Rounds", desc:"+2 bullet damage",     apply: p=>p.dmg+=2 },
+      { id:"firerate",    name:"Rapid Fire",       desc:"+20% fire rate",       apply: p=>p.fireRate*=1.20 },
+      { id:"move",        name:"Agility",          desc:"+15% move speed",      apply: p=>p.speed*=1.15 },
+      { id:"projectiles", name:"Split Shot",       desc:"Fires at +1 additional enemy (max 10)", apply: p=>{ p.projectiles = Math.min(10, p.projectiles+1); } },
+      { id:"pickup",      name:"Magnet",           desc:"+60 pickup radius",    apply: p=>p.pickup+=60 },
+      { id:"hp",          name:"Fortitude",        desc:"Max HP +20 and heal 10", apply: p=>{ p.maxHp+=20; p.hp = Math.min(p.maxHp, p.hp+10);} },
+      { id:"maxhp",       name:"Vitality",         desc:"Max HP +20",           apply: p=>{ p.maxHp+=20; p.hp = Math.min(p.hp, p.maxHp);} },
+      { id:"regen",       name:"Regen",            desc:"Regenerate 1 HP every 10s", apply: p=>{ p.regenRate = Math.max(p.regenRate, 1/10);} },
     ];
     function chooseUpgrades(n=3){ const picks=[], pool=[...UPGRADE_POOL]; for(let i=0;i<n&&pool.length;i++){ const idx=irand(0,pool.length-1); picks.push(pool[idx]); pool.splice(idx,1);} return picks; }
     function showUpgradeChoices(g){
@@ -463,11 +499,10 @@
       });
     }
 
-    // Shooting — targets multiple distinct enemies up to Split Shot count
+    // Shooting — distinct targets up to Split Shot count
     const BULLET_SPEED = 460;
     const BULLET_SIZE = 4;
     function getNearestEnemies(p, n){
-      // returns up to n distinct enemies sorted by distance
       const arr = game.enemies.map(e => ({ e, d2: dist2(p.x,p.y,e.x,e.y) }));
       arr.sort((a,b)=>a.d2-b.d2);
       const out = [];
@@ -495,10 +530,11 @@
       if(!running) return;
       const dt = Math.min(0.033,(ts-lastTime)/1000); lastTime=ts;
       update(dt); draw();
+      positionHealthBar(); // keep pinned to canvas on resize/zoom
       if(running) requestAnimationFrame(loop);
     }
 
-    // Simple spatial hash for enemy separation
+    // Simple spatial hash for enemy separation + overlap resolution
     const CELL = 64;
     function cellKey(x,y){ return ((x/CELL)|0)+","+((y/CELL)|0); }
     function buildGrid(arr){
@@ -524,7 +560,6 @@
       const g=game; if (!g || g.over) return;
       if (!g.pausedForUpgrade){
         g.time = nowSec() - g.t0;
-        g.difficulty = 1 + g.time*0.2;
 
         // Move player
         const p=g.player;
@@ -554,37 +589,34 @@
           if (b.life<=0 || b.x<-40 || b.x>WORLD_W+40 || b.y<-40 || b.y>WORLD_H+40) g.bullets.splice(i,1);
         }
 
-        // Spawning continuous with cap
+        // Spawning
         trySpawn(dt);
 
         // Build grid for separation
         const grid = buildGrid(g.enemies);
 
-        // Enemies: steer towards player with separation and keep-distance
-        const desiredRing = 22;  // distance beyond combined radii to hold
-        const sepRadius = 28;    // separation check radius
+        // Enemies: orbit target + strong separation and overlap resolution
+        const sepRadius = 42;
         for (let i=g.enemies.length-1;i>=0;i--){
           const e=g.enemies[i];
           const dx=p.x-e.x, dy=p.y-e.y, d=Math.hypot(dx,dy)||1, ux=dx/d, uy=dy/d;
 
-          // base pursuit velocity
-          let vx = ux*e.speed, vy = uy*e.speed;
+          // Choose target: orbit around the player (spreads angles)
+          e.angle += e.turn * dt;
+          // If far away, chase directly to catch up
+          const far = d > 320;
+          const orbitR = e.orbitR;
+          const tx = far ? p.x : p.x + Math.cos(e.angle) * orbitR;
+          const ty = far ? p.y : p.y + Math.sin(e.angle) * orbitR;
 
-          // keep a little ring around player to prevent sticking
-          const keep = p.r + e.r + desiredRing;
-          if (d < keep){
-            const push = (keep - d) * 2.0;
-            vx -= ux * push;
-            vy -= uy * push;
-            // add slight tangential drift to avoid rigid clustering
-            const tx = -uy, ty = ux;
-            vx += tx * 40;
-            vy += ty * 40;
-          }
+          // Steering towards target
+          const tdx = tx - e.x, tdy = ty - e.y, td = Math.hypot(tdx,tdy)||1;
+          let ax = (tdx/td) * e.speed * 1.6;
+          let ay = (tdy/td) * e.speed * 1.6;
 
-          // separation from neighbors
+          // Separation
           const neigh = neighborList(grid, e.x, e.y);
-          let sx=0, sy=0, sc=0;
+          let sx=0, sy=0;
           for (const o of neigh){
             if (o===e) continue;
             const ddx = e.x - o.x, ddy = e.y - o.y;
@@ -593,38 +625,62 @@
               const f = (sepRadius - dd) / sepRadius;
               sx += (ddx/dd) * f;
               sy += (ddy/dd) * f;
-              sc++;
             }
           }
-          if (sc>0){
-            vx += sx * 120;
-            vy += sy * 120;
+          ax += sx * 500;
+          ay += sy * 500;
+
+          // Soft keep-out near player to avoid sticking
+          const keep = p.r + e.r + 18;
+          if (d < keep){
+            ax -= ux * (keep - d) * 500;
+            ay -= uy * (keep - d) * 500;
           }
 
-          // clamp to max speed
-          const sp = Math.hypot(vx,vy);
-          if (sp > e.speed){ vx = vx/sp*e.speed; vy = vy/sp*e.speed; }
+          // Integrate simple velocity with damping
+          e.vx = (e.vx + ax*dt) * 0.90;
+          e.vy = (e.vy + ay*dt) * 0.90;
 
-          e.x += vx*dt; e.y += vy*dt;
-          e.anim.t += dt*(0.6 + e.speed/140);
+          // Clamp to max speed
+          const sp = Math.hypot(e.vx,e.vy);
+          const maxSp = e.speed;
+          if (sp > maxSp){ e.vx = e.vx/sp*maxSp; e.vy = e.vy/sp*maxSp; }
+
+          e.x += e.vx*dt; e.y += e.vy*dt;
 
           // Per-enemy contact cooldown
           e.hitCD = Math.max(0, e.hitCD - dt);
           const rSum = e.r + p.r;
           if (dist2(e.x,e.y,p.x,p.y) < rSum*rSum){
             if (e.hitCD <= 0){
-              p.hp -= e.touch; // enemy1=2, enemy2=4, ...
+              p.hp -= e.touch;
               e.hitCD = 0.45;
               if (p.hp<=0){ p.hp=0; endGame(); break; }
             }
           }
 
-          // clamp enemy to world
+          // Clamp enemy to world
           e.x = clamp(e.x, e.r, WORLD_W - e.r);
           e.y = clamp(e.y, e.r, WORLD_H - e.r);
         }
 
-        // Bullet vs enemy (also spawn damage text)
+        // Quick overlap pushback to prevent visible clumping
+        for (let i=0;i<g.enemies.length;i++){
+          const a=g.enemies[i];
+          for (let j=i+1;j<g.enemies.length;j++){
+            const b=g.enemies[j];
+            const dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy);
+            const minD = (a.r + b.r) * 1.1;
+            if (d>0 && d<minD){
+              const push = (minD - d) * 0.5;
+              const ux=dx/d, uy=dy/d;
+              a.x -= ux*push; a.y -= uy*push;
+              b.x += ux*push; b.y += uy*push;
+            }
+          }
+        }
+
+        // Bullet vs enemy
         for (let i=g.bullets.length-1;i>=0;i--){
           const b=g.bullets[i];
           let hit = false;
@@ -639,14 +695,15 @@
                 x: e.x + jitter,
                 y: e.y - e.r - 10,
                 val: b.dmg,
-                life: 0.8,
-                vy: -28,
-                color: "#ffe08a"
+                life: 0.8, vy: -28, color: "#ffe08a"
               });
 
               if (e.hp<=0){
                 g.kills++;
+                // XP gem
                 g.gems.push({ x:e.x, y:e.y, r:5, value:e.value, vx:rand(-20,20), vy:rand(-20,20), homing:false });
+                // Small chance to drop a health pack on death (extra source)
+                if (Math.random() < 0.06) spawnHealthPack(e.x, e.y);
                 g.enemies.splice(j,1);
               }
               hit = true; break;
@@ -655,7 +712,7 @@
           if (hit) g.bullets.splice(i,1);
         }
 
-        // Gems
+        // XP Gems — faster homing
         for (let i=g.gems.length-1;i>=0;i--){
           const gem=g.gems[i]; gem.vx*=0.96; gem.vy*=0.96;
           if (!gem.homing){
@@ -664,12 +721,40 @@
           }
           if (gem.homing){
             const dx=p.x-gem.x, dy=p.y-gem.y, len=Math.hypot(dx,dy)||1, ux=dx/len, uy=dy/len;
-            gem.vx += ux*900*dt; gem.vy += uy*900*dt;
-            const sp=Math.hypot(gem.vx,gem.vy), maxSp=500; if (sp>maxSp){ gem.vx*=maxSp/sp; gem.vy*=maxSp/sp; }
+            gem.vx += ux*1400*dt; gem.vy += uy*1400*dt; // accel up
+            const sp=Math.hypot(gem.vx,gem.vy), maxSp=800; if (sp>maxSp){ gem.vx*=maxSp/sp; gem.vy*=maxSp/sp; }
           }
           gem.x+=gem.vx*dt; gem.y+=gem.vy*dt;
           if (dist2(gem.x,gem.y,p.x,p.y) < (gem.r+p.r)*(gem.r+p.r)){ grantXP(g, gem.value); g.gems.splice(i,1); }
           gem.x = clamp(gem.x, 6, WORLD_W-6); gem.y = clamp(gem.y, 6, WORLD_H-6);
+        }
+
+        // Health packs: low-rate map spawns
+        g.healthSpawnAccum += dt;
+        if (g.healthSpawnAccum >= 7){ // check every ~7s
+          g.healthSpawnAccum = 0;
+          if (g.healthPacks.length < 3 && Math.random() < 0.25){
+            // spawn somewhere in current view
+            const x = clamp(rand(camera.x+24, camera.x+BASE_W-24), 24, WORLD_W-24);
+            const y = clamp(rand(camera.y+24, camera.y+BASE_H-24), 24, WORLD_H-24);
+            spawnHealthPack(x,y);
+          }
+        }
+        // update health packs + pickup
+        for (let i=g.healthPacks.length-1; i>=0; i--){
+          const h = g.healthPacks[i];
+          h.t += dt;
+          // collect
+          if (dist2(h.x,h.y,p.x,p.y) < (h.r+p.r)*(h.r+p.r)){
+            const heal = h.heal;
+            const before = p.hp;
+            p.hp = Math.min(p.maxHp, p.hp + heal);
+            const got = p.hp - before;
+            if (got>0){
+              g.dmgTexts.push({ x:p.x, y:p.y-20, val:`+${got}`, life:0.9, vy:-30, color:"#9eff9e" });
+            }
+            g.healthPacks.splice(i,1);
+          }
         }
 
         // Damage texts update
@@ -682,6 +767,10 @@
         }
       }
       updateHUD();
+    }
+
+    function spawnHealthPack(x,y){
+      game.healthPacks.push({ x, y, r:7, heal: 20, t:0 });
     }
 
     function grantXP(g, amt){
@@ -723,12 +812,13 @@
       for (const b of g.bullets) drawBullet(b);
       for (const e of g.enemies) drawEnemySprite(e);
       drawDamageTexts(g.dmgTexts);
+      for (const h of g.healthPacks) drawHealth(h);
       drawPlayer(g.player);
 
       ctx.restore();
     }
 
-    // World draw: imported map or simple fallback
+    // World draw
     function drawWorld(){
       if (MAP.ready) {
         ctx.imageSmoothingEnabled = false;
@@ -739,7 +829,7 @@
       }
     }
 
-    // Player/enemy/gems/bullets
+    // Player/enemy/gems/bullets/health
     function drawPlayer(p){
       ctx.save();
       ctx.fillStyle="rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.ellipse(p.x, p.y + p.r*0.6, p.r*1.1, p.r*0.55, 0, 0, Math.PI*2); ctx.fill();
@@ -753,7 +843,6 @@
 
     function drawEnemySprite(e){
       ctx.save();
-      // Shadow
       ctx.fillStyle="rgba(0,0,0,0.30)";
       ctx.beginPath(); ctx.ellipse(e.x, e.y + e.r*0.7, e.r*1.1, e.r*0.5, 0, 0, Math.PI*2); ctx.fill();
 
@@ -767,7 +856,7 @@
         ctx.fillStyle="#ff6b6b"; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.fill();
       }
 
-      // HP bar uses real maxHp now
+      // HP bar
       ctx.fillStyle="rgba(0,0,0,0.55)"; ctx.fillRect(e.x - e.r, e.y - e.r - 8, e.r*2, 4);
       const w = clamp(e.hp / e.maxHp, 0, 1) * e.r*2; ctx.fillStyle="#ff6b6b"; ctx.fillRect(e.x - e.r, e.y - e.r - 8, w, 4);
 
@@ -782,6 +871,18 @@
 
     function drawGem(gem){
       ctx.save(); ctx.beginPath(); ctx.arc(gem.x, gem.y, gem.r, 0, Math.PI*2); ctx.fillStyle="#5adfb2"; ctx.shadowColor="#5adfb2"; ctx.shadowBlur=10; ctx.fill(); ctx.restore();
+    }
+
+    function drawHealth(h){
+      ctx.save();
+      // pulsing red circle with white plus
+      const pulse = 0.2*Math.sin(h.t*5);
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.r*(1+pulse), 0, Math.PI*2);
+      ctx.fillStyle="#ff7777"; ctx.shadowColor="#ff8a8a"; ctx.shadowBlur=10; ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle="white";
+      ctx.beginPath(); ctx.moveTo(h.x, h.y - h.r/2); ctx.lineTo(h.x, h.y + h.r/2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(h.x - h.r/2, h.y); ctx.lineTo(h.x + h.r/2, h.y); ctx.stroke();
+      ctx.restore();
     }
 
     function drawDamageTexts(arr){
