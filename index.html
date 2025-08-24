@@ -141,8 +141,8 @@
       </div>
       <div id="how" class="subtitle" style="display:none;margin-top:12px">
         - Move with joystick (touch) or WASD/Arrows.<br/>
-        - Auto-shoots nearest enemy. XP orbs latch and keep homing.<br/>
-        - Constant enemy flow, capped by level. Enemy variety expands as you level.<br/>
+        - Auto-shoots up to N different targets (Split Shot). XP orbs latch and keep homing.<br/>
+        - Enemies space out and circle; contact damages you per-enemy type.<br/>
         - Use transparent PNGs. The loader will auto-remove a solid black matte if detected.
       </div>
     </div>
@@ -271,7 +271,6 @@
 
     // Sprite loading: map + enemies, with auto background cleanup (corner chroma-key)
     function prepareSprite(img) {
-      // Draw to offscreen and remove a uniform corner background if present (e.g., solid black)
       const w = img.naturalWidth, h = img.naturalHeight;
       const off = document.createElement("canvas"); off.width = w; off.height = h;
       const oc = off.getContext("2d", { willReadFrequently: true });
@@ -313,10 +312,9 @@
       MAP.ready = true;
       // Adapt world size to map
       WORLD_W = MAP.w; WORLD_H = MAP.h;
-      // If a game is running, expand arena bounds dynamically
       if (game) game.arena = { w: WORLD_W, h: WORLD_H, padding: 24 };
     };
-    MAP.img.src = ASSET_PATH + "map.png"; // place map.png next to index.html (or in ASSET_PATH)
+    MAP.img.src = ASSET_PATH + "map.png"; // background image name
 
     // Enemies 1..10
     const SPRITES = [];
@@ -347,13 +345,13 @@
         player: {
           x: WORLD_W/2, y: WORLD_H/2, r: 12, speed: 190,
           hp: 120, maxHp: 120, regenRate: 0, regenTimer: 0,
-          dmg: 6, fireRate: 3.2, cooldown: 0, bulletSpeed: 460, bulletSize: 4, pierce: 0, projectiles: 1,
-          pickup: 140, xp: 0, level: 1, xpToNext: 24, invuln: 0
+          dmg: 6, fireRate: 3.0, cooldown: 0, projectiles: 1,
+          pickup: 140, xp: 0, level: 1, xpToNext: 60, // will be overwritten below
         },
         enemies: [], bullets: [], gems: [],
-        dmgTexts: [], // floating damage numbers
+        dmgTexts: [],
         kills: 0,
-        spawnRate: 0.7,    // continuous flow
+        spawnRate: 0.8,
         spawnAccum: 0,
         difficulty: 1,
         pausedForUpgrade: false, over: false,
@@ -363,6 +361,7 @@
 
     function startGame(){
       game = defaultGame();
+      game.player.xpToNext = xpNeededFor(game.player.level);
       startOverlay.style.display = "none";
       upgradesOverlay.style.display = "none";
       overOverlay.style.display = "none";
@@ -371,23 +370,27 @@
       requestAnimationFrame(loop);
     }
 
-    function xpNeededFor(level){ return Math.floor(24 * Math.pow(1.18, Math.max(0, level-1))); }
+    // Slower leveling: more kills needed
+    function xpNeededFor(level){
+      // start 60, then scale up ~35% per level
+      return Math.floor(60 * Math.pow(1.35, Math.max(0, level - 1)));
+    }
 
-    // Enemy definitions (10 sprites) with level gating and weights
+    // Enemy defs: contact damage scales by type (2,4,6,...)
     const ENEMY_DEFS = [
-      null, // 0 unused (index 1-10)
-      { id:1, minLevel:1,  base:{hp:24, spd:85,  touch:2, value:6},  scale:1.0, weight:4 },
-      { id:2, minLevel:1,  base:{hp:26, spd:75,  touch:2, value:6},  scale:1.0, weight:3 },
-      { id:3, minLevel:2,  base:{hp:32, spd:95,  touch:3, value:8},  scale:1.1, weight:3 },
-      { id:4, minLevel:3,  base:{hp:40, spd:80,  touch:3, value:9},  scale:1.2, weight:3 },
-      { id:5, minLevel:4,  base:{hp:30, spd:120, touch:3, value:10}, scale:0.95, weight:2 },
-      { id:6, minLevel:5,  base:{hp:55, spd:70,  touch:4, value:12}, scale:1.25, weight:2 },
-      { id:7, minLevel:6,  base:{hp:48, spd:100, touch:4, value:12}, scale:1.1, weight:2 },
-      { id:8, minLevel:7,  base:{hp:62, spd:90,  touch:5, value:14}, scale:1.2, weight:2 },
-      { id:9, minLevel:8,  base:{hp:80, spd:80,  touch:6, value:16}, scale:1.3, weight:1 },
-      { id:10,minLevel:10, base:{hp:120,spd:70,  touch:8, value:20}, scale:1.4, weight:1 }
+      null,
+      { id:1,  minLevel:1,  base:{hp:24,  spd:85,  value:4},  scale:1.00, weight:4 },
+      { id:2,  minLevel:1,  base:{hp:26,  spd:75,  value:4},  scale:1.00, weight:3 },
+      { id:3,  minLevel:2,  base:{hp:32,  spd:95,  value:5},  scale:1.10, weight:3 },
+      { id:4,  minLevel:3,  base:{hp:40,  spd:80,  value:6},  scale:1.15, weight:3 },
+      { id:5,  minLevel:4,  base:{hp:30,  spd:120, value:7},  scale:0.95, weight:2 },
+      { id:6,  minLevel:5,  base:{hp:55,  spd:70,  value:8},  scale:1.25, weight:2 },
+      { id:7,  minLevel:6,  base:{hp:48,  spd:100, value:9},  scale:1.10, weight:2 },
+      { id:8,  minLevel:7,  base:{hp:62,  spd:90,  value:10}, scale:1.20, weight:2 },
+      { id:9,  minLevel:8,  base:{hp:80,  spd:80,  value:11}, scale:1.30, weight:1 },
+      { id:10, minLevel:10, base:{hp:120, spd:70,  value:12}, scale:1.40, weight:1 }
     ];
-    function enemyCap(level){ return 18 + Math.floor(level*7); }
+    function enemyCap(level){ return 16 + Math.floor(level * 6); }
     function availableTypes(level){
       const out=[]; for(let i=1;i<=10;i++){ if (ENEMY_DEFS[i].minLevel <= level) out.push(ENEMY_DEFS[i]); } return out;
     }
@@ -404,7 +407,7 @@
       g.spawnAccum += dt;
       const level = p.level;
       const cap = enemyCap(level);
-      if (g.enemies.length >= cap) { g.spawnAccum = 0; return; }
+      if (g.enemies.length >= cap) { g.spawnAccum = Math.min(g.spawnAccum, g.spawnRate); return; }
       const interval = g.spawnRate;
       while (g.spawnAccum >= interval && g.enemies.length < cap){
         spawnEnemy(level);
@@ -425,31 +428,32 @@
       x = clamp(x, 0, WORLD_W); y = clamp(y, 0, WORLD_H);
 
       const dScale = 1 + (game.time*0.03);
+      const maxSpeed = 145; // cap so you can always outrun eventually
+      const typeId = def.id;
       const E = {
-        typeId: def.id,
+        typeId,
         x, y,
         r: 12*def.scale,
         hp: Math.floor(def.base.hp * dScale),
-        speed: def.base.spd + game.time*0.5,
-        touch: def.base.touch,
+        maxHp: Math.floor(def.base.hp * dScale),
+        speed: Math.min(def.base.spd * (1 + game.time*0.02), maxSpeed),
         value: def.base.value,
-        anim: { t: 0 }
+        touch: typeId * 2,        // 2,4,6,...
+        anim: { t: 0 },
+        hitCD: 0                  // per-enemy contact cooldown
       };
       game.enemies.push(E);
     }
 
-    // Upgrades
+    // Upgrades (removed Piercing / Bullet Speed / Bullet Size)
     const UPGRADE_POOL = [
-      { id:"dmg", name:"Sharpened Rounds", desc:"+2 bullet damage", apply: p=>p.dmg+=2 },
-      { id:"firerate", name:"Rapid Fire", desc:"+20% fire rate", apply: p=>p.fireRate*=1.20 },
-      { id:"move", name:"Agility", desc:"+15% move speed", apply: p=>p.speed*=1.15 },
-      { id:"projectiles", name:"Split Shot", desc:"+1 projectile", apply: p=>p.projectiles+=1 },
-      { id:"pierce", name:"Piercing Shots", desc:"Bullets pierce +1", apply: p=>p.pierce+=1 },
-      { id:"pickup", name:"Magnet", desc:"+60 pickup radius", apply: p=>p.pickup+=60 },
-      { id:"hp", name:"Fortitude", desc:"Max HP +20 and heal 10", apply: p=>{ p.maxHp+=20; p.hp = Math.min(p.maxHp, p.hp+10);} },
-      { id:"bulletspd", name:"Propellant", desc:"+20% bullet speed", apply: p=>p.bulletSpeed*=1.2 },
-      { id:"regen", name:"Regen", desc:"Regenerate 1 HP every 10s", apply: p=>{ p.regenRate = Math.max(p.regenRate, 1/10);} },
-      { id:"size", name:"Heftier Rounds", desc:"Bullet size +1", apply: p=>p.bulletSize+=1 }
+      { id:"dmg",       name:"Sharpened Rounds", desc:"+2 bullet damage", apply: p=>p.dmg+=2 },
+      { id:"firerate",  name:"Rapid Fire",       desc:"+20% fire rate",  apply: p=>p.fireRate*=1.20 },
+      { id:"move",      name:"Agility",          desc:"+15% move speed", apply: p=>p.speed*=1.15 },
+      { id:"projectiles", name:"Split Shot",     desc:"Fires at +1 additional enemy (max 10)", apply: p=>{ p.projectiles = Math.min(10, p.projectiles+1); } },
+      { id:"pickup",    name:"Magnet",           desc:"+60 pickup radius", apply: p=>p.pickup+=60 },
+      { id:"hp",        name:"Fortitude",        desc:"Max HP +20 and heal 10", apply: p=>{ p.maxHp+=20; p.hp = Math.min(p.maxHp, p.hp+10);} },
+      { id:"regen",     name:"Regen",            desc:"Regenerate 1 HP every 10s", apply: p=>{ p.regenRate = Math.max(p.regenRate, 1/10);} },
     ];
     function chooseUpgrades(n=3){ const picks=[], pool=[...UPGRADE_POOL]; for(let i=0;i<n&&pool.length;i++){ const idx=irand(0,pool.length-1); picks.push(pool[idx]); pool.splice(idx,1);} return picks; }
     function showUpgradeChoices(g){
@@ -459,18 +463,30 @@
       });
     }
 
-    // Shooting
+    // Shooting — targets multiple distinct enemies up to Split Shot count
+    const BULLET_SPEED = 460;
+    const BULLET_SIZE = 4;
+    function getNearestEnemies(p, n){
+      // returns up to n distinct enemies sorted by distance
+      const arr = game.enemies.map(e => ({ e, d2: dist2(p.x,p.y,e.x,e.y) }));
+      arr.sort((a,b)=>a.d2-b.d2);
+      const out = [];
+      for (let i=0; i<arr.length && out.length<n; i++) out.push(arr[i].e);
+      return out;
+    }
     function shoot(g){
       const p=g.player; if (g.enemies.length===0) return;
-      let nearest=null, best=Infinity;
-      for(const e of g.enemies){ const d2=dist2(p.x,p.y,e.x,e.y); if (d2<best){ best=d2; nearest=e; } }
-      if(!nearest) return;
-      const dx=nearest.x-p.x, dy=nearest.y-p.y, len=Math.hypot(dx,dy)||1; const ux=dx/len, uy=dy/len;
-      const spread=Math.min(0.35, 0.08*(p.projectiles-1)); const count=p.projectiles; const angleBase=Math.atan2(uy,ux);
-      for(let i=0;i<count;i++){
-        const t = count===1 ? 0 : (i/(count-1)-0.5);
-        const theta = angleBase + spread*(t*2);
-        game.bullets.push({ x:p.x+ux*(p.r+6), y:p.y+uy*(p.r+6), vx:Math.cos(theta)*p.bulletSpeed, vy:Math.sin(theta)*p.bulletSpeed, r:p.bulletSize, dmg:p.dmg, life:1.5, pierce:p.pierce });
+      const count = Math.min(p.projectiles, 10);
+      const targets = getNearestEnemies(p, count);
+      if (targets.length === 0) return;
+      for (let i=0; i<count; i++){
+        const tgt = targets[i % targets.length];
+        const dx=tgt.x-p.x, dy=tgt.y-p.y, len=Math.hypot(dx,dy)||1; const ux=dx/len, uy=dy/len;
+        g.bullets.push({
+          x:p.x+ux*(p.r+6), y:p.y+uy*(p.r+6),
+          vx:ux*BULLET_SPEED, vy:uy*BULLET_SPEED,
+          r:BULLET_SIZE, dmg:p.dmg, life:1.5
+        });
       }
     }
 
@@ -482,13 +498,35 @@
       if(running) requestAnimationFrame(loop);
     }
 
+    // Simple spatial hash for enemy separation
+    const CELL = 64;
+    function cellKey(x,y){ return ((x/CELL)|0)+","+((y/CELL)|0); }
+    function buildGrid(arr){
+      const grid = new Map();
+      for (const e of arr){
+        const k = cellKey(e.x,e.y);
+        if (!grid.has(k)) grid.set(k, []);
+        grid.get(k).push(e);
+      }
+      return grid;
+    }
+    function neighborList(grid, x, y){
+      const cx = (x/CELL)|0, cy=(y/CELL)|0, out=[];
+      for (let yy=cy-1; yy<=cy+1; yy++){
+        for (let xx=cx-1; xx<=cx+1; xx++){
+          const k=xx+","+yy; const v=grid.get(k); if (v) out.push(...v);
+        }
+      }
+      return out;
+    }
+
     function update(dt){
       const g=game; if (!g || g.over) return;
       if (!g.pausedForUpgrade){
         g.time = nowSec() - g.t0;
         g.difficulty = 1 + g.time*0.2;
 
-        // Move player (keys + joystick)
+        // Move player
         const p=g.player;
         let mx=0,my=0;
         if (keys.has("w")||keys.has("arrowup")) my-=1;
@@ -519,27 +557,77 @@
         // Spawning continuous with cap
         trySpawn(dt);
 
-        // Enemies move to player + collide
+        // Build grid for separation
+        const grid = buildGrid(g.enemies);
+
+        // Enemies: steer towards player with separation and keep-distance
+        const desiredRing = 22;  // distance beyond combined radii to hold
+        const sepRadius = 28;    // separation check radius
         for (let i=g.enemies.length-1;i>=0;i--){
           const e=g.enemies[i];
-          const dx=p.x-e.x, dy=p.y-e.y, len=Math.hypot(dx,dy)||1, ux=dx/len, uy=dy/len;
-          e.x += ux*e.speed*dt; e.y += uy*e.speed*dt;
+          const dx=p.x-e.x, dy=p.y-e.y, d=Math.hypot(dx,dy)||1, ux=dx/d, uy=dy/d;
+
+          // base pursuit velocity
+          let vx = ux*e.speed, vy = uy*e.speed;
+
+          // keep a little ring around player to prevent sticking
+          const keep = p.r + e.r + desiredRing;
+          if (d < keep){
+            const push = (keep - d) * 2.0;
+            vx -= ux * push;
+            vy -= uy * push;
+            // add slight tangential drift to avoid rigid clustering
+            const tx = -uy, ty = ux;
+            vx += tx * 40;
+            vy += ty * 40;
+          }
+
+          // separation from neighbors
+          const neigh = neighborList(grid, e.x, e.y);
+          let sx=0, sy=0, sc=0;
+          for (const o of neigh){
+            if (o===e) continue;
+            const ddx = e.x - o.x, ddy = e.y - o.y;
+            const dd = Math.hypot(ddx,ddy);
+            if (dd > 0 && dd < sepRadius){
+              const f = (sepRadius - dd) / sepRadius;
+              sx += (ddx/dd) * f;
+              sy += (ddy/dd) * f;
+              sc++;
+            }
+          }
+          if (sc>0){
+            vx += sx * 120;
+            vy += sy * 120;
+          }
+
+          // clamp to max speed
+          const sp = Math.hypot(vx,vy);
+          if (sp > e.speed){ vx = vx/sp*e.speed; vy = vy/sp*e.speed; }
+
+          e.x += vx*dt; e.y += vy*dt;
           e.anim.t += dt*(0.6 + e.speed/140);
+
+          // Per-enemy contact cooldown
+          e.hitCD = Math.max(0, e.hitCD - dt);
           const rSum = e.r + p.r;
           if (dist2(e.x,e.y,p.x,p.y) < rSum*rSum){
-            if (p.invuln<=0){
-              p.hp -= e.touch; p.invuln = 0.7;
+            if (e.hitCD <= 0){
+              p.hp -= e.touch; // enemy1=2, enemy2=4, ...
+              e.hitCD = 0.45;
               if (p.hp<=0){ p.hp=0; endGame(); break; }
             }
           }
-        }
 
-        // Player i-frames
-        g.player.invuln = Math.max(0, g.player.invuln - dt);
+          // clamp enemy to world
+          e.x = clamp(e.x, e.r, WORLD_W - e.r);
+          e.y = clamp(e.y, e.r, WORLD_H - e.r);
+        }
 
         // Bullet vs enemy (also spawn damage text)
         for (let i=g.bullets.length-1;i>=0;i--){
           const b=g.bullets[i];
+          let hit = false;
           for (let j=g.enemies.length-1;j>=0;j--){
             const e=g.enemies[j]; const rSum=b.r+e.r;
             if (dist2(b.x,b.y,e.x,e.y)<=rSum*rSum){
@@ -551,8 +639,8 @@
                 x: e.x + jitter,
                 y: e.y - e.r - 10,
                 val: b.dmg,
-                life: 0.8, // seconds
-                vy: -28,   // pixels per second upward
+                life: 0.8,
+                vy: -28,
                 color: "#ffe08a"
               });
 
@@ -561,12 +649,13 @@
                 g.gems.push({ x:e.x, y:e.y, r:5, value:e.value, vx:rand(-20,20), vy:rand(-20,20), homing:false });
                 g.enemies.splice(j,1);
               }
-              if (b.pierce>0){ b.pierce--; b.x+=b.vx*0.01; b.y+=b.vy*0.01; } else { g.bullets.splice(i,1); break; }
+              hit = true; break;
             }
           }
+          if (hit) g.bullets.splice(i,1);
         }
 
-        // Gems: latch homing forever once triggered
+        // Gems
         for (let i=g.gems.length-1;i>=0;i--){
           const gem=g.gems[i]; gem.vx*=0.96; gem.vy*=0.96;
           if (!gem.homing){
@@ -588,7 +677,7 @@
           const d = g.dmgTexts[i];
           d.y += d.vy * dt;
           d.life -= dt;
-          d.vy -= 8 * dt; // slight acceleration upward
+          d.vy -= 8 * dt;
           if (d.life <= 0) g.dmgTexts.splice(i,1);
         }
       }
@@ -628,17 +717,12 @@
       ctx.save();
       ctx.translate(-camera.x, -camera.y);
 
-      drawWorld();      // map
+      drawWorld();
 
-      // Gems
       for (const gem of g.gems) drawGem(gem);
-      // Bullets
       for (const b of g.bullets) drawBullet(b);
-      // Enemies
       for (const e of g.enemies) drawEnemySprite(e);
-      // Damage texts
       drawDamageTexts(g.dmgTexts);
-      // Player
       drawPlayer(g.player);
 
       ctx.restore();
@@ -650,7 +734,6 @@
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(MAP.canvas, 0, 0, MAP.w, MAP.h);
       } else {
-        // Fallback (simple grass)
         ctx.fillStyle = "#2b5d2b";
         ctx.fillRect(camera.x, camera.y, BASE_W, BASE_H);
       }
@@ -659,16 +742,11 @@
     // Player/enemy/gems/bullets
     function drawPlayer(p){
       ctx.save();
-      // Shadow
       ctx.fillStyle="rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.ellipse(p.x, p.y + p.r*0.6, p.r*1.1, p.r*0.55, 0, 0, Math.PI*2); ctx.fill();
-      // Flash when invuln
-      const flicker = p.invuln>0 ? (Math.sin(performance.now()/50)>0?1:0.6) : 1; ctx.globalAlpha=flicker;
-      // Body
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
       const grd=ctx.createRadialGradient(p.x-3,p.y-4,4, p.x,p.y,p.r+4); grd.addColorStop(0,"#9be7ff"); grd.addColorStop(1,"#2ea5ff");
       ctx.fillStyle=grd; ctx.fill();
       ctx.lineWidth=2; ctx.strokeStyle="rgba(255,255,255,0.6)"; ctx.stroke();
-      // Eye
       ctx.beginPath(); ctx.arc(p.x+4, p.y-3, 2, 0, Math.PI*2); ctx.fillStyle="#fff"; ctx.fill();
       ctx.restore();
     }
@@ -681,18 +759,17 @@
 
       const s = SPRITES[e.typeId];
       if (s && s.ready && s.canvas){
-        const scale = (e.r*2) / Math.max(1, Math.max(s.w, s.h)); // fit by max dimension
+        const scale = (e.r*2) / Math.max(1, Math.max(s.w, s.h));
         const dw = s.w * scale, dh = s.h * scale;
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(s.canvas, e.x - dw/2, e.y - dh/2, dw, dh);
       } else {
-        // fallback placeholder while image loads
         ctx.fillStyle="#ff6b6b"; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.fill();
       }
 
-      // Small HP bar
+      // HP bar uses real maxHp now
       ctx.fillStyle="rgba(0,0,0,0.55)"; ctx.fillRect(e.x - e.r, e.y - e.r - 8, e.r*2, 4);
-      const w = clamp(e.hp / 80, 0, 1) * e.r*2; ctx.fillStyle="#ff6b6b"; ctx.fillRect(e.x - e.r, e.y - e.r - 8, w, 4);
+      const w = clamp(e.hp / e.maxHp, 0, 1) * e.r*2; ctx.fillStyle="#ff6b6b"; ctx.fillRect(e.x - e.r, e.y - e.r - 8, w, 4);
 
       ctx.restore();
     }
@@ -715,7 +792,6 @@
         ctx.font = "bold 16px sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "bottom";
-        // outline for readability
         ctx.fillStyle = "rgba(0,0,0,0.6)";
         ctx.fillText(String(d.val), d.x + 1, d.y + 1);
         ctx.fillStyle = d.color;
