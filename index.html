@@ -29,7 +29,6 @@
       .joystick { left: 12px; bottom: 12px; width: 140px; height: 140px; }
       .skills { right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; width: 140px; align-items: flex-end; }
 
-      /* Skill buttons: ring = cooldown, inner fill = active duration remaining */
       .skill-btn {
         width: 56px; height: 56px; border-radius: 14px;
         background: linear-gradient(180deg, #ffb255 0%, #ff7a1e 100%);
@@ -43,40 +42,45 @@
         mix-blend-mode: screen; pointer-events: none;
       }
       .skill-btn .label { position: relative; z-index: 3; letter-spacing: .5px; }
-
-      /* Active duration fill (top-down) */
-      .skill-btn .cooler {
-        position: absolute; inset: 0; border-radius: 14px; pointer-events: none; overflow: hidden; z-index: 1;
-      }
+      .skill-btn .cooler { position: absolute; inset: 0; border-radius: 14px; pointer-events: none; overflow: hidden; z-index: 1; }
       .skill-btn .cooler::after {
-        content: ""; position: absolute; left: 0; right: 0; top: 0;
-        height: calc((1 - var(--active, 0)) * 100%); /* 1 -> empty (time’s up), 0 -> full */
-        background: linear-gradient(180deg, rgba(48,237,255,.28), rgba(28,167,255,.18));
-        backdrop-filter: brightness(1.05);
-        transition: height 100ms linear;
+        content: ""; position: absolute; left: 0; right: 0; bottom: 0;
+        height: calc((1 - var(--pct, 0)) * 100%);
+        background: linear-gradient(0deg, rgba(0,0,0,.48) 0%, rgba(0,0,0,.28) 100%);
+        transition: height 120ms linear;
       }
-
-      /* Cooldown ring (outside, fills clockwise) */
       .skill-btn .ring {
         position: absolute; inset: -4px; border-radius: 50%; z-index: 2; pointer-events: none;
-        background: conic-gradient(rgba(255,255,255,.92) calc(var(--cool,0) * 360deg), rgba(255,255,255,.15) 0);
+        background: conic-gradient(rgba(255,255,255,.9) calc(var(--pct,0) * 360deg), rgba(255,255,255,.15) 0);
         -webkit-mask: radial-gradient(farthest-side, transparent calc(50% - 5px), #000 calc(50% - 5px));
                 mask: radial-gradient(farthest-side, transparent calc(50% - 5px), #000 calc(50% - 5px));
-        opacity: .85; transition: background 100ms linear, opacity 120ms ease;
+        opacity: .8; transition: background 100ms linear, opacity 120ms ease;
       }
       .skill-btn.ready { box-shadow: 0 0 18px rgba(255,158,43,.45), 0 8px 14px rgba(0,0,0,.45); }
       .skill-btn[disabled] { opacity: .45; pointer-events: none; }
 
       .overlay { position: absolute; inset: 0; background: rgba(2, 6, 23, 0.6); display: flex; align-items: center; justify-content: center; pointer-events: auto; }
-      .choices { display: flex; gap: 12px; padding: 12px; background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); border-radius: 12px; border: 1px solid rgba(255,255,255,0.04); }
-      .choice { width: 88px; height: 88px; min-width: 88px; min-height: 88px; background: #0f1724; border-radius: 10px; color: var(--hud); font-size: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border: 2px solid rgba(255,255,255,0.04); cursor: pointer; }
+      .choices {
+        display: flex; gap: 12px; padding: 12px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+        border-radius: 12px; border: 1px solid rgba(255,255,255,0.04);
+      }
+      .choice {
+        width: 88px; height: 88px; min-width: 88px; min-height: 88px;
+        background: #0f1724; border-radius: 10px; color: var(--hud); font-size: 12px;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        text-align: center; border: 2px solid rgba(255,255,255,0.04); cursor: pointer;
+      }
       .choice:active { transform: scale(0.98); }
 
       .xpbar-wrap { position: absolute; left: 10%; right: 10%; bottom: 8px; height: 12px; background: rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden; }
       .xpbar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); width: 0%; }
 
       .wavebar-wrap { position: absolute; top: 6px; left: 0; right: 0; pointer-events: none; z-index: 5; padding-left: 120px; padding-right: 16px; }
-      .wavebar { position: relative; margin: 0 auto; width: 82%; max-width: 360px; height: 18px; background: rgba(255,255,255,.08); border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); }
+      .wavebar {
+        position: relative; margin: 0 auto; width: 82%; max-width: 360px; height: 18px;
+        background: rgba(255,255,255,.08); border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,.08);
+      }
       .wavebar-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: linear-gradient(90deg, #35d0de, #1ca7ff); transition: width 120ms linear; }
       .wavebar-text { position: absolute; inset: 0; display: grid; place-items: center; color: var(--hud); font: 11px system-ui, sans-serif; text-shadow: 0 1px 0 rgba(0,0,0,.35); }
 
@@ -153,7 +157,8 @@
       const CUSTOM_SPRITE_CANVAS = {};
       function loadChromaImage(src, key=[0,0,0], tol=40) {
         return new Promise((resolve) => {
-          const img = new Image(); img.crossOrigin = "anonymous";
+          const img = new Image();
+          img.crossOrigin = "anonymous";
           img.onload = () => {
             const oc = document.createElement("canvas");
             oc.width = img.width; oc.height = img.height;
@@ -165,10 +170,10 @@
               for (let i = 0; i < data.data.length; i += 4) {
                 const r = data.data[i], g = data.data[i+1], b = data.data[i+2];
                 const dr=r-key[0], dg=g-key[1], db=b-key[2];
-                if (dr*dr + dg*dg + db*db <= t2 || (r < 8 && g < 8 && b < 8)) data.data[i+3] = 0;
+                if (dr*dr + dg*dg + db*db <= t2 || (r < 8 && g < 8 && b < 8)) data.data[i+3] = 0; // remove black
               }
               ox.putImageData(data, 0, 0);
-            } catch (e) {}
+            } catch (e) { /* if CORS blocks, just use as-is */ }
             resolve(oc);
           };
           img.onerror = () => resolve(null);
@@ -176,13 +181,14 @@
         });
       }
       async function loadOptionalEnemyImages() {
-        for (const n of ["enemy1","enemy2","enemy3"]) {
+        const names = ["enemy1","enemy2","enemy3"];
+        for (const n of names) {
           const c = await loadChromaImage(n + ".jpg");
           if (c) CUSTOM_SPRITE_CANVAS[n] = c;
         }
       }
 
-      /* Pixel fallback sprites */
+      /* Pixel fallback sprites (used when no image found) */
       const SPRITES = {
         enemy1: [
           [null, null, "#16321a", "#16321a", null],
@@ -217,7 +223,8 @@
         const scale = desiredW / w;
         const sx = Math.floor(-desiredW / 2), sy = Math.floor(-(h * scale) / 2);
         for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
-          const col = sprite[r][c]; if (!col) continue;
+          const col = sprite[r][c];
+          if (!col) continue;
           ctx.fillStyle = col;
           ctx.fillRect(cx + sx + c * scale, cy + sy + r * scale, Math.ceil(scale), Math.ceil(scale));
           if (outline) { ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.strokeRect(cx + sx + c * scale, cy + sy + r * scale, Math.ceil(scale), Math.ceil(scale)); }
@@ -237,7 +244,6 @@
         explosions: [],
         fxParticles: [],
         damageTexts: [],
-        world: { trees: [], flowers: [], houses: [], roads: [] },
 
         score: 0,
         level: 1,
@@ -261,8 +267,6 @@
         skillSlots: [null, null, null],
         skillCooldowns: [0, 0, 0],
         skillLevels: {},
-        skillActiveTimers: [0, 0, 0],     // active duration left
-        skillActiveTotals: [1, 1, 1],     // active duration total
 
         paused: false,
         muted: false,
@@ -291,7 +295,6 @@
           this.skillSlots = [null, null, null];
           this.skillCooldowns = [0, 0, 0];
           this.skillLevels = {};
-          this.skillActiveTimers = [0,0,0]; this.skillActiveTotals = [1,1,1];
           this.paused = false; this.running = true;
           this.lastAimAngle = -Math.PI / 2;
 
@@ -301,8 +304,6 @@
 
           if (this.playLoopReq) cancelAnimationFrame(this.playLoopReq);
           this.playLoopReq = requestAnimationFrame(loop);
-
-          buildWorld();
           startWave(this.wave);
         },
       };
@@ -371,7 +372,7 @@
         }
       }
 
-      /* Group spawning with size-based HP buffs */
+      /* Group spawning: clustered packs that scale with wave */
       function spawnEnemyGroup(count) {
         const types = ["enemy1", "enemy2", "enemy3"];
         const side = Math.floor(Math.random() * 4);
@@ -382,7 +383,7 @@
         else if (side === 2) { ax = pad + Math.random() * (game.worldW - pad * 2); ay = -60; }
         else { ax = pad + Math.random() * (game.worldW - pad * 2); ay = game.worldH + 60; }
 
-        const spread = 120;
+        const spread = 120; // cluster radius
         const waveFactorHp = 1 + (game.wave - 1) * 0.18;
         const speedFactor = 1 + (game.wave - 1) * 0.02;
 
@@ -390,12 +391,11 @@
           if (game.waveSpawned >= game.waveTotal) return;
           const t = types[Math.floor(Math.random() * types.length)];
           const base = enemyBaseStats(t);
-
-          const size = 12 + Math.random() * 20; // some larger than others
-          const sizeBuff = 1 + Math.max(0, (size - 12) / 20) * 0.7; // up to +70% HP
-          const hp = Math.round((base.baseHp + Math.random() * 8) * waveFactorHp * sizeBuff);
+          const hp = Math.round((base.baseHp + Math.random() * 8) * waveFactorHp);
           const speed = (base.baseSpeed + Math.random() * 20) * speedFactor;
+          const size = 12 + Math.random() * 20;
 
+          // scatter around anchor
           const a = Math.random() * Math.PI * 2;
           const r = (Math.random() ** 0.7) * spread;
           const x = ax + Math.cos(a) * r;
@@ -414,7 +414,6 @@
           type: "active",
           cooldown: 8,
           maxLevel: 15,
-          duration(level) { return 0.3; }, // short visible active bar
           activate(level) {
             const base = 100 + 20 * Math.max(0, level - 1);
             const mult = 1 + (player._dmg || 0);
@@ -431,7 +430,6 @@
           type: "active",
           cooldown: 12,
           maxLevel: 15,
-          duration(level) { return 5 + 0.5 * Math.max(0, level - 1); },
           activate(level) {
             const dur = 5 + 0.5 * Math.max(0, level - 1);
             player.invuln = Math.max(player.invuln || 0, dur);
@@ -444,9 +442,9 @@
           type: "active",
           cooldown: 15,
           maxLevel: 15,
-          duration(level) { return 7; },
           activate(level) {
-            const mult = 1.8 + 0.1 * Math.max(0, level - 1);
+            // multiplicative fire-rate bonus; scales slightly with level
+            const mult = 1.8 + 0.1 * Math.max(0, level - 1); // 1.8x at Lv1
             player._hasteMult = Math.max(player._hasteMult || 1, mult);
             player._hasteT = Math.max(player._hasteT || 0, 7);
             FarcadeSafe.haptic();
@@ -475,6 +473,14 @@
         return pick;
       }
 
+      function checkLevelUp() {
+        if (game.xp >= game.xpToNext) {
+          game.xp -= game.xpToNext; game.level += 1;
+          game.xpToNext = Math.floor(game.xpToNext * 1.35 + game.level * 5);
+          game.paused = true; FarcadeSafe.haptic(); showLevelUpOverlay();
+        }
+      }
+
       function showLevelUpOverlay() {
         const wrap = document.createElement("div"); wrap.className = "overlay"; wrap.id = "lvlup";
         const choicesWrap = document.createElement("div"); choicesWrap.className = "choices";
@@ -500,25 +506,16 @@
 
       function updateSkillButtons() {
         for (let i = 0; i < 3; i++) {
-          const btn = document.getElementById(`skill${i}`);
-          const label = btn.querySelector(".label");
-          const cool = btn.querySelector(".cooler");
-          const ring = btn.querySelector(".ring");
+          const btn = document.getElementById(`skill${i}`); const label = btn.querySelector(".label"); const cool = btn.querySelector(".cooler"); const ring = btn.querySelector(".ring");
           const key = game.skillSlots[i];
-
           if (!key) {
             label.textContent = "+"; btn.style.opacity = 0.6; btn.setAttribute("disabled","true");
-            cool.style.setProperty("--active","0"); ring.style.setProperty("--cool","0"); btn.classList.remove("ready");
+            cool.style.setProperty("--pct","0"); ring.style.setProperty("--pct","0"); btn.classList.remove("ready");
           } else {
             const nm = ALL_SKILLS[key].name.slice(0,2).toUpperCase(); label.textContent = nm; btn.style.opacity = 1; btn.removeAttribute("disabled");
-            // ring = cooldown
-            const cd = game.skillCooldowns[i] || 0; const totalCd = ALL_SKILLS[key].cooldown || 4;
-            const coolPct = 1 - Math.max(0, Math.min(1, cd / totalCd));
-            ring.style.setProperty("--cool", String(coolPct));
-            // inner = active duration
-            const at = game.skillActiveTimers[i] || 0, atTot = game.skillActiveTotals[i] || 1;
-            const activePct = Math.max(0, Math.min(1, at / atTot));
-            cool.style.setProperty("--active", String(activePct));
+            const cd = game.skillCooldowns[i] || 0; const total = ALL_SKILLS[key].cooldown || 4;
+            const pct = 1 - Math.max(0, Math.min(1, cd / total));
+            cool.style.setProperty("--pct", String(pct)); ring.style.setProperty("--pct", String(pct));
             if (cd <= 0) btn.classList.add("ready"); else btn.classList.remove("ready");
           }
         }
@@ -527,12 +524,7 @@
         const key = game.skillSlots[i]; if (!key) return;
         const s = ALL_SKILLS[key]; if (!s) return; if (game.skillCooldowns[i] > 0) return;
         const lv = game.skillLevels[key] || 1;
-        s.activate(lv);
-        const dur = typeof s.duration === "function" ? s.duration(lv) : 0;
-        game.skillActiveTimers[i] = dur > 0 ? dur : 0;
-        game.skillActiveTotals[i] = Math.max(1, dur || 1);
-        game.skillCooldowns[i] = s.cooldown || 4;
-        updateSkillButtons();
+        s.activate(lv); game.skillCooldowns[i] = s.cooldown || 4; updateSkillButtons();
       }
 
       /* Combat helpers */
@@ -548,10 +540,17 @@
       function createExplosion(x, y, r, life = 0.22) { game.explosions.push({ x, y, r, life, ttl: life }); }
       function spawnExplosionFX(x, y) {
         for (let i = 0; i < 2; i++) game.fxParticles.push({ type: "ring", x, y, r: 14 + i * 12, vr: 360, alpha: 0.7, va: -1.4, ttl: 0.35 });
-        for (let i = 0; i < 26; i++) { const a = Math.random() * Math.PI * 2, sp = 140 + Math.random() * 160; game.fxParticles.push({ type: "spark", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 1.5 + Math.random() * 2.5, ttl: 0.45 + Math.random() * 0.25, hue: 18 + Math.random() * 20 }); }
-        for (let i = 0; i < 14; i++) { const a = Math.random() * Math.PI * 2, sp = 30 + Math.random() * 60; game.fxParticles.push({ type: "smoke", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 10 + Math.random() * 14, alpha: 0.35, ttl: 0.8 + Math.random() * 0.4 }); }
+        for (let i = 0; i < 26; i++) {
+          const a = Math.random() * Math.PI * 2, sp = 140 + Math.random() * 160;
+          game.fxParticles.push({ type: "spark", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 1.5 + Math.random() * 2.5, ttl: 0.45 + Math.random() * 0.25, hue: 18 + Math.random() * 20 });
+        }
+        for (let i = 0; i < 14; i++) {
+          const a = Math.random() * Math.PI * 2, sp = 30 + Math.random() * 60;
+          game.fxParticles.push({ type: "smoke", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 10 + Math.random() * 14, alpha: 0.35, ttl: 0.8 + Math.random() * 0.4 });
+        }
       }
 
+      /* Shooting */
       function fireBulletTowardsTarget(x, y, targetX, targetY, dmg = 12) {
         const nx = targetX - x, ny = targetY - y, m = Math.hypot(nx, ny) || 1, speed = 460;
         game.bullets.push({ x, y, vx: (nx / m) * speed, vy: (ny / m) * speed, r: 4, dmg, ttl: 2.6 });
@@ -560,9 +559,9 @@
         FarcadeSafe.haptic();
       }
 
-      /* Waves (+10 per wave, tuned alive caps) */
-      function waveSize(w) { return 30 + 10 * (w - 1); }
-      function waveAliveCap(w) { return Math.min(42, 14 + Math.floor(w * 1.2)); }
+      /* Waves */
+      function waveSize(w) { return 30 + 6 * (w - 1); } // a bit larger to go with grouped spawns
+      function waveAliveCap(w) { return Math.min(36, 12 + Math.floor(w * 1.1)); }
 
       function startWave(w) {
         game.wave = w; game.waveTotal = waveSize(w); game.waveKills = 0; game.waveSpawned = 0;
@@ -595,64 +594,6 @@
         if (text) text.textContent = `Wave ${game.wave}/${game.maxWaves}  Enemies ${game.waveKills}/${game.waveTotal}`;
       }
 
-      /* World build: more trees, more houses, longer roads, more flowers */
-      function buildWorld() {
-        const W = game.worldW, H = game.worldH;
-        game.world.trees = [];
-        game.world.houses = [];
-        game.world.flowers = [];
-        game.world.roads = [];
-
-        // Main diagonal road (extends beyond edges)
-        game.world.roads.push({
-          pts: [
-            { x: -120, y: H + 80 },
-            { x: W * 0.22, y: H * 0.72 },
-            { x: W * 0.45, y: H * 0.52 },
-            { x: W * 0.66, y: H * 0.34 },
-            { x: W + 120, y: -80 },
-          ],
-          width: 46
-        });
-        // Side branch
-        game.world.roads.push({
-          pts: [
-            { x: W * 0.40, y: H * 0.60 },
-            { x: W * 0.32, y: H * 0.40 },
-            { x: W * 0.20, y: H * 0.22 },
-            { x: -120,  y: H * 0.12 }
-          ],
-          width: 38
-        });
-
-        // Houses (a couple more)
-        const houseSpots = [
-          { x: W * 0.27, y: H * 0.67, s: 1.15 },
-          { x: W * 0.56, y: H * 0.36, s: 1.2 },
-          { x: W * 0.40, y: H * 0.52, s: 1.05 },
-          { x: W * 0.18, y: H * 0.25, s: 1.1 },
-        ];
-        game.world.houses.push(...houseSpots);
-
-        // Lots of bigger trees
-        for (let i = 0; i < 380; i++) {
-          game.world.trees.push({
-            x: Math.random() * W,
-            y: Math.random() * H,
-            s: 1.15 + Math.random() * 0.55
-          });
-        }
-
-        // More flowers
-        for (let i = 0; i < 1000; i++) {
-          game.world.flowers.push({
-            x: Math.random() * W,
-            y: Math.random() * H,
-            c: Math.random() < 0.33 ? "#ffd166" : (Math.random() < 0.5 ? "#ff7ac9" : "#ffffff")
-          });
-        }
-      }
-
       /* Main loop */
       let lastFrame = performance.now();
       function loop(ts) {
@@ -671,9 +612,9 @@
         else player.walkAnim = Math.max(0, (player.walkAnim || 0) - dt * 8);
         clampPlayer();
 
-        // camera (rounded to remove top-edge jitter)
-        game.cameraX = Math.round(clamp(player.x - game.viewW / 2, 0, Math.max(0, game.worldW - game.viewW)));
-        game.cameraY = Math.round(clamp(player.y - game.viewH / 2, 0, Math.max(0, game.worldH - game.viewH)));
+        // camera
+        game.cameraX = clamp(player.x - game.viewW / 2, 0, Math.max(0, game.worldW - game.viewW));
+        game.cameraY = clamp(player.y - game.viewH / 2, 0, Math.max(0, game.worldH - game.viewH));
 
         // regen
         if (player._regen) game.hp = Math.min(game.maxHp, game.hp + player._regen * dt);
@@ -684,10 +625,7 @@
           if (player._hasteT === 0) player._hasteMult = 1;
         }
 
-        // Active-duration timers for buttons
-        for (let i = 0; i < 3; i++) if (game.skillActiveTimers[i] > 0) game.skillActiveTimers[i] = Math.max(0, game.skillActiveTimers[i] - dt);
-
-        // auto-fire
+        // auto-fire toward nearest enemies within range
         const autoShootRange = 200;
         const fireInterval = game.baseFireInterval / (player._hasteMult || 1);
         game.shootTimer -= dt;
@@ -711,8 +649,8 @@
         if (game.spawnTimer <= 0 && game.enemies.length < game.waveAliveCap && game.waveSpawned < game.waveTotal) {
           const remaining = game.waveTotal - game.waveSpawned;
           const aliveSlots = Math.max(0, game.waveAliveCap - game.enemies.length);
-          const base = Math.round(clamp(6 + game.wave * 0.9, 6, 20 + game.wave * 0.25));
-          let groupSize = Math.min(remaining, Math.max(4, Math.min(aliveSlots, base + Math.floor(Math.random() * 3) - 1)));
+          const base = Math.round(clamp(5 + game.wave * 0.8, 5, 18 + game.wave * 0.2));
+          let groupSize = Math.min(remaining, Math.max(3, Math.min(aliveSlots, base + Math.floor(Math.random() * 3) - 1)));
           spawnEnemyGroup(groupSize);
           game.spawnTimer = game.spawnCadence + 0.4 * Math.random();
         }
@@ -738,6 +676,7 @@
           const dx = player.x - e.x, dy = player.y - e.y, mag = Math.hypot(dx, dy) || 1;
           e.x += (dx / mag) * e.speed * dt; e.y += (dy / mag) * e.speed * dt;
 
+          // contact damage scales: 1 at wave1, +0.2 per wave
           const contactDmg = 1 + (game.wave - 1) * 0.2;
           if (circleHit(e.x, e.y, e.r, player.x, player.y, player.r + (player.invuln ? 4 : 0))) {
             if (!player.invuln && now / 1000 - game.lastHitTime > 0.5) {
@@ -747,7 +686,7 @@
 
           if (e.hp <= 0) {
             game.score += Math.floor(5 + Math.random() * 8 + game.wave * 2);
-            let xpGain = 4 + Math.floor(Math.random() * 6) + Math.floor(game.wave * 0.6); // a touch more XP for balance
+            let xpGain = 4 + Math.floor(Math.random() * 6) + Math.floor(game.wave * 0.5);
             if (player._xpBoost) xpGain = Math.floor(xpGain * (1 + player._xpBoost));
             game.pickups.push({ x: e.x, y: e.y, amt: xpGain, ttl: 12, seed: Math.random() });
             game.enemies.splice(i, 1);
@@ -777,16 +716,19 @@
         // cooldowns
         for (let i = 0; i < 3; i++) {
           if (game.skillCooldowns[i] > 0) game.skillCooldowns[i] = Math.max(0, game.skillCooldowns[i] - dt);
+          const btn = document.getElementById(`skill${i}`), key = game.skillSlots[i];
+          if (!btn || !key) continue; const cool = btn.querySelector(".cooler"), ring = btn.querySelector(".ring");
+          const total = ALL_SKILLS[key].cooldown || 4; const pct = 1 - Math.max(0, Math.min(1, (game.skillCooldowns[i] || 0) / total));
+          cool.style.setProperty("--pct", String(pct)); ring.style.setProperty("--pct", String(pct));
+          if (pct >= 1) btn.classList.add("ready"); else btn.classList.remove("ready");
         }
 
-        // damage text
         for (let i = game.damageTexts.length - 1; i >= 0; i--) {
           const t = game.damageTexts[i]; t.ttl -= dt; t.y += t.vy * dt; t.vy += 40 * dt; if (t.ttl <= 0) game.damageTexts.splice(i, 1);
         }
 
         if (player.invuln > 0) player.invuln = Math.max(0, player.invuln - dt);
         game.score += dt * 0.3;
-        updateSkillButtons();
         checkLevelUp();
 
         if (game.hp <= 0) { game.running = false; FarcadeSafe.haptic(); FarcadeSafe.gameOver({ score: Math.floor(game.score), waves: game.wave }); return; }
@@ -795,14 +737,14 @@
         render();
       }
 
-      /* Rendering */
+      /* Rendering — match the attached pixel scene */
       function render() {
         const vw = game.viewW, vh = game.viewH;
         const camX = game.cameraX, camY = game.cameraY;
 
         drawLandscape(camX, camY, vw, vh);
 
-        // explosions + FX
+        // explosion rings + FX
         for (const ex of game.explosions) {
           const sx = ex.x - camX, sy = ex.y - camY; const t = Math.max(0, ex.ttl / ex.life);
           ctx.fillStyle = `rgba(255,120,80,${0.12 + 0.28 * t})`; ctx.beginPath();
@@ -810,9 +752,14 @@
         }
         for (const p of game.fxParticles) {
           const sx = p.x - camX, sy = p.y - camY;
-          if (p.type === "ring") { ctx.strokeStyle = `rgba(255,200,120,${Math.max(0, p.alpha)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI * 2); ctx.stroke(); }
-          else if (p.type === "spark") { ctx.fillStyle = `hsl(${p.hue}, 90%, 60%)`; ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI * 2); ctx.fill(); }
-          else if (p.type === "smoke") { ctx.fillStyle = `rgba(80,80,80,${p.alpha})`; ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI * 2); ctx.fill(); }
+          if (p.type === "ring") {
+            ctx.strokeStyle = `rgba(255,200,120,${Math.max(0, p.alpha)})`; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI * 2); ctx.stroke();
+          } else if (p.type === "spark") {
+            ctx.fillStyle = `hsl(${p.hue}, 90%, 60%)`; ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI * 2); ctx.fill();
+          } else if (p.type === "smoke") {
+            ctx.fillStyle = `rgba(80,80,80,${p.alpha})`; ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI * 2); ctx.fill();
+          }
         }
 
         // bullets
@@ -847,6 +794,7 @@
             const sprite = SPRITES[e.spriteKey] || SPRITES.enemy1;
             drawPixelSprite(sprite, sx, sy, Math.max(18, e.r * 1.8), true);
           }
+          // hp bar
           ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(sx - e.r, sy - e.r - 8, e.r * 2, 4);
           ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fillRect(sx - e.r, sy - e.r - 8, Math.max(0, (e.hp / e.maxHp)) * e.r * 2, 4);
         }
@@ -855,6 +803,7 @@
         const psx = player.x - camX, psy = player.y - camY;
         drawOrangePlayer(psx, psy);
 
+        // shield visual
         if (player.invuln > 0) {
           const alpha = 0.35 + 0.15 * Math.sin(game.timeElapsed * 8), r = player.r * (1.7 + 0.05 * Math.sin(game.timeElapsed * 6));
           ctx.save(); ctx.globalCompositeOperation = "lighter";
@@ -878,87 +827,101 @@
         ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.strokeRect(pad, pad + 42, hpW, 10);
         ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "11px system-ui, sans-serif"; ctx.fillText(`HP: ${Math.floor(Math.max(0, game.hp))}/${game.maxHp}`, pad + hpW + 8, pad + 51);
 
+        // Rapid Fire indicator
         if (player._hasteT > 0) {
           const secs = Math.ceil(player._hasteT);
           ctx.fillStyle = "rgba(255,255,255,0.85)";
-          ctx.fillText(`Rapid Fire ${secs}s`, vw - 120, pad + 14);
+          ctx.fillText(`Rapid Fire ${secs}s`, vw - 110, pad + 14);
         }
       }
 
-      /* Landscape (revamped: longer roads, more/bigger trees, more flowers, more houses) */
+      /* Landscape matching the attached pixel image */
       function drawLandscape(camX, camY, vw, vh) {
-        // grass base
-        ctx.fillStyle = "#7ccb53"; ctx.fillRect(0, 0, vw, vh);
+        // bright grass base
+        ctx.fillStyle = "#7ccb53";
+        ctx.fillRect(0, 0, vw, vh);
 
-        // gentle grass texture
+        // subtle grass noise dots
         const tile = 16;
         for (let gx = Math.floor(camX / tile) * tile; gx < camX + vw + tile; gx += tile) {
           for (let gy = Math.floor(camY / tile) * tile; gy < camY + vh + tile; gy += tile) {
             const sx = gx - camX, sy = gy - camY;
-            ctx.fillStyle = "#6bb946"; ctx.fillRect(sx + 10, sy + 6, 2, 2);
-            ctx.fillStyle = "#8edc64"; ctx.fillRect(sx + 6, sy + 3, 2, 2);
+            ctx.fillStyle = "#6bb946";
+            ctx.fillRect(sx + 10, sy + 6, 2, 2);
+            ctx.fillRect(sx + 2, sy + 12, 2, 2);
+            ctx.fillStyle = "#8edc64";
+            ctx.fillRect(sx + 6, sy + 3, 2, 2);
           }
         }
 
-        // roads
+        // winding path (yellow dirt) roughly like the image
         ctx.save();
         ctx.translate(-camX, -camY);
-        for (const road of game.world.roads) {
-          const p = new Path2D();
-          for (let i = 0; i < road.pts.length; i++) {
-            const pt = road.pts[i];
-            if (i === 0) p.moveTo(pt.x, pt.y);
-            else {
-              const prev = road.pts[i - 1];
-              const cx = (prev.x + pt.x) / 2, cy = (prev.y + pt.y) / 2;
-              p.quadraticCurveTo(prev.x, prev.y, cx, cy);
-            }
-          }
-          ctx.lineWidth = road.width;
-          ctx.lineCap = "round";
-          ctx.strokeStyle = "#e9d584"; ctx.stroke(p);
-          ctx.save();
-          ctx.globalCompositeOperation = "multiply";
-          ctx.strokeStyle = "rgba(0,0,0,0.12)";
-          ctx.stroke(p);
-          ctx.restore();
-        }
+        const p = new Path2D();
+        p.moveTo(game.worldW * 0.15, game.worldH * 0.85);
+        p.quadraticCurveTo(game.worldW * 0.22, game.worldH * 0.7, game.worldW * 0.33, game.worldH * 0.64);
+        p.quadraticCurveTo(game.worldW * 0.45, game.worldH * 0.56, game.worldW * 0.50, game.worldH * 0.46);
+        p.quadraticCurveTo(game.worldW * 0.55, game.worldH * 0.36, game.worldW * 0.60, game.worldH * 0.33);
+        ctx.lineWidth = 44; ctx.lineCap = "round"; ctx.strokeStyle = "#e9d584"; ctx.stroke(p);
+        ctx.lineWidth = 44; ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.globalCompositeOperation = "multiply"; ctx.stroke(p);
+        ctx.globalCompositeOperation = "source-over";
         ctx.restore();
 
         // houses
-        for (const h of game.world.houses) drawHouse(h.x - camX, h.y - camY, h.s);
+        drawHouse(game.worldW * 0.27 - camX, game.worldH * 0.67 - camY, 1.0);
+        drawHouse(game.worldW * 0.56 - camX, game.worldH * 0.36 - camY, 1.1);
 
-        // trees
-        for (const t of game.world.trees) drawPixelTree(t.x - camX, t.y - camY, t.s);
+        // trees placed similarly to the image
+        const treePos = [
+          [0.14,0.12],[0.32,0.12],[0.66,0.10],[0.82,0.16],
+          [0.22,0.28],[0.47,0.26],[0.74,0.27],
+          [0.18,0.48],[0.38,0.46],[0.72,0.50],[0.86,0.44]
+        ];
+        for (const [tx, ty] of treePos) drawPixelTree(game.worldW * tx - camX, game.worldH * ty - camY, 1);
 
-        // flowers
-        for (let i = 0; i < game.world.flowers.length; i++) {
-          const f = game.world.flowers[i];
-          const sx = f.x - camX, sy = f.y - camY;
-          if (sx < -8 || sx > vw + 8 || sy < -8 || sy > vh + 8) continue;
-          ctx.fillStyle = f.c; ctx.fillRect(Math.round(sx), Math.round(sy), 2, 2);
+        // tiny flowers sprinkled
+        for (let fx = 0; fx < vw; fx += 24) {
+          const y = Math.floor((fx * 37 + camY * 13) % 24);
+          drawFlower(fx + 8, y + 10);
         }
       }
 
       function drawPixelTree(x, y, s=1) {
-        ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(s, s);
-        ctx.fillStyle = "rgba(0,0,0,0.20)"; ctx.beginPath(); ctx.ellipse(0, 12, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#6b3f1d"; ctx.fillRect(-2, -2, 4, 14);
-        ctx.fillStyle = "#4fa93f"; ctx.beginPath(); ctx.arc(0, -8, 14, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#2f7b2c"; ctx.beginPath(); ctx.arc(-7, -10, 9, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#7cd86a"; ctx.beginPath(); ctx.arc(7, -10, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+        // shadow
+        ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.beginPath(); ctx.ellipse(0, 10, 10, 4, 0, 0, Math.PI * 2); ctx.fill();
+        // trunk
+        ctx.fillStyle = "#6b3f1d"; ctx.fillRect(-2, 0, 4, 10);
+        // canopy
+        ctx.fillStyle = "#4fa93f"; ctx.beginPath(); ctx.arc(0, -6, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#2f7b2c"; ctx.beginPath(); ctx.arc(-6, -8, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#7cd86a"; ctx.beginPath(); ctx.arc(6, -8, 7, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       }
 
       function drawHouse(x, y, s=1) {
-        ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(s, s);
+        ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+        // shadow
         ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(-20, 18, 44, 6);
+        // walls
         ctx.fillStyle = "#f2e4b3"; ctx.fillRect(-18, 0, 36, 22);
+        // door
         ctx.fillStyle = "#5e3a1f"; ctx.fillRect(-4, 8, 8, 14);
-        ctx.fillStyle = "#cc3024"; ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(0, -14); ctx.lineTo(22, 0); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = "#e0523e"; ctx.beginPath(); ctx.moveTo(-18, 0); ctx.lineTo(0, -10); ctx.lineTo(18, 0); ctx.closePath(); ctx.fill();
+        // roof
+        ctx.fillStyle = "#cc3024"; ctx.beginPath();
+        ctx.moveTo(-22, 0); ctx.lineTo(0, -14); ctx.lineTo(22, 0); ctx.closePath(); ctx.fill();
+        // roof highlight
+        ctx.fillStyle = "#e0523e"; ctx.beginPath();
+        ctx.moveTo(-18, 0); ctx.lineTo(0, -10); ctx.lineTo(18, 0); ctx.closePath(); ctx.fill();
+        // window
         ctx.fillStyle = "#d4b36c"; ctx.fillRect(10, 8, 8, 6);
         ctx.restore();
+      }
+
+      function drawFlower(x, y) {
+        ctx.fillStyle = "#ffd166"; ctx.fillRect(x, y, 2, 2);
+        ctx.fillStyle = "#ff7ac9"; ctx.fillRect(x+3, y-2, 2, 2);
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(x-3, y-1, 2, 2);
       }
 
       /* Player visuals */
@@ -968,6 +931,11 @@
         const grad = ctx.createRadialGradient(-r * 0.25, -r * 0.5, r * 0.2, 0, 0, r * 1.05);
         grad.addColorStop(0, "#ffd68a"); grad.addColorStop(0.35, "#ffb24f"); grad.addColorStop(1, "#ff7a1e");
         ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "rgba(0,0,0,0.08)";
+        for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; const rad = r * (0.4 + Math.random() * 0.5);
+          const px = Math.cos(a) * rad * 0.8, py = Math.sin(a) * rad * 0.8;
+          ctx.beginPath(); ctx.arc(px, py, 0.9 + Math.random() * 0.6, 0, Math.PI * 2); ctx.fill();
+        }
         ctx.strokeStyle = "#4e3a1f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-2, -r + 6); ctx.lineTo(4, -r - 6); ctx.stroke();
         const dir = normalize(player.dir.x || 0, player.dir.y || -1); const ang = Math.atan2(dir.y, dir.x);
         ctx.save(); ctx.translate(4, -r - 6); ctx.rotate(ang * 0.15 - 0.4);
@@ -1005,8 +973,16 @@
       /* UI loop */
       (function uiLoop() {
         const bar = $("#xpbar"); if (bar) bar.style.width = `${Math.min(100, (game.xp / game.xpToNext) * 100)}%`;
+        for (let i = 0; i < 3; i++) {
+          const btn = document.getElementById(`skill${i}`); if (!btn) continue;
+          const key = game.skillSlots[i]; const cool = btn.querySelector(".cooler"); const ring = btn.querySelector(".ring");
+          if (!key) { cool.style.setProperty("--pct","0"); ring.style.setProperty("--pct","0"); } else {
+            const total = ALL_SKILLS[key].cooldown || 4; const pct = 1 - Math.max(0, Math.min(1, (game.skillCooldowns[i] || 0) / total));
+            cool.style.setProperty("--pct", String(pct)); ring.style.setProperty("--pct", String(pct));
+            if (pct >= 1) btn.classList.add("ready"); else btn.classList.remove("ready");
+          }
+        }
         updateWaveBar();
-        updateSkillButtons();
         requestAnimationFrame(uiLoop);
       })();
 
@@ -1027,7 +1003,7 @@
         player.x = game.worldW * 0.5; player.y = game.worldH * 0.7; clampPlayer();
         setupJoystick(); setupSkillButtons(); updateSkillButtons();
         new ResizeObserver(resizeCanvas).observe(canvas); resizeCanvas(); game.reset();
-        loadOptionalEnemyImages();
+        loadOptionalEnemyImages(); // try to use enemy1.jpg / enemy2.jpg / enemy3.jpg if present
         setTimeout(() => FarcadeSafe.ready(), 250);
       }
       function boot() {
@@ -1041,6 +1017,7 @@
       });
 
       window.addEventListener("resize", () => resizeCanvas());
+
       resizeCanvas();
     </script>
   </body>
