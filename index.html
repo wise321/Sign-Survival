@@ -80,7 +80,7 @@
         align-items: flex-end;
       }
 
-      /* Redesigned skill buttons */
+      /* Redesigned skill buttons (fixed inner structure; label preserved) */
       .skill-btn {
         width: 56px;
         height: 56px;
@@ -101,7 +101,6 @@
         isolation: isolate;
       }
       .skill-btn::before {
-        /* subtle rim shine */
         content: "";
         position: absolute;
         inset: 0;
@@ -110,6 +109,10 @@
         mix-blend-mode: screen;
         pointer-events: none;
       }
+      .skill-btn .label {
+        position: relative;
+        z-index: 2;
+      }
       /* vertical cooldown fill: loads bottom -> up */
       .skill-btn .cooler {
         position: absolute;
@@ -117,6 +120,7 @@
         border-radius: 14px;
         pointer-events: none;
         overflow: hidden;
+        z-index: 1;
       }
       .skill-btn .cooler::after {
         content: "";
@@ -124,7 +128,6 @@
         left: 0; right: 0; bottom: 0;
         height: calc(var(--fill, 0) * 100%);
         background: linear-gradient(0deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.06) 100%);
-        /* makes the fill feel like a "loading" plate rising */
         transition: height 120ms linear;
         border-bottom-left-radius: 14px;
         border-bottom-right-radius: 14px;
@@ -195,6 +198,46 @@
         background: linear-gradient(90deg, var(--accent), var(--accent2));
         width: 0%;
       }
+
+      /* NEW: Wave bar at top center */
+      .wavebar-wrap {
+        position: absolute;
+        top: 6px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 5;
+      }
+      .wavebar {
+        position: relative;
+        width: 64%;
+        max-width: 280px;
+        height: 12px;
+        background: rgba(255,255,255,0.08);
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.06);
+      }
+      .wavebar-fill {
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 0%;
+        background: linear-gradient(90deg, #35d0de, #1ca7ff);
+        transition: width 120ms linear;
+      }
+      .wavebar-text {
+        position: absolute;
+        left: 0; right: 0; top: 50%;
+        transform: translateY(-50%);
+        color: var(--hud);
+        font: 10px system-ui, sans-serif;
+        text-align: center;
+        text-shadow: 0 1px 0 rgba(0,0,0,0.35);
+        pointer-events: none;
+      }
+
       @media (max-width: 340px) {
         .joystick {
           width: 120px;
@@ -220,6 +263,15 @@
     <div class="wrap" id="gameWrap">
       <div class="frame">
         <canvas id="c"></canvas>
+
+        <!-- NEW: Wave bar -->
+        <div class="wavebar-wrap">
+          <div class="wavebar">
+            <div class="wavebar-fill" id="waveFill"></div>
+            <div class="wavebar-text" id="waveText">Wave 1/100</div>
+          </div>
+        </div>
+
         <div class="touch-layer" id="touchLayer">
           <div class="joystick" id="joystick"></div>
           <div class="skills" id="skills">
@@ -231,7 +283,7 @@
               style="background: linear-gradient(180deg, #ffb255, #ff7a1e)"
             >
               <div class="cooler"></div>
-              A
+              <span class="label">A</span>
             </div>
             <div
               class="skill-btn"
@@ -241,7 +293,7 @@
               style="background: linear-gradient(180deg, #7c5cff, #4f3bd6)"
             >
               <div class="cooler"></div>
-              B
+              <span class="label">B</span>
             </div>
             <div
               class="skill-btn"
@@ -251,10 +303,11 @@
               style="background: linear-gradient(180deg, #35d0de, #1ca7ff)"
             >
               <div class="cooler"></div>
-              C
+              <span class="label">C</span>
             </div>
           </div>
         </div>
+
         <div class="xpbar-wrap"><div class="xpbar" id="xpbar"></div></div>
         <!-- Level-up overlay injected dynamically -->
       </div>
@@ -373,16 +426,29 @@
         decorations: { trees: [], flowers: [], insects: [] },
         damageTexts: [],
         score: 0,
-        level: 1,
+        level: 1, // player XP level (unchanged)
         xp: 0,
         xpToNext: 20,
-        hp: 100,
-        maxHp: 100,
+
+        // player health readjusted
+        hp: 50,
+        maxHp: 50,
+
+        // wave system
+        wave: 1,
+        maxWaves: 100,
+        waveSpawned: 0,
+        waveKills: 0,
+        waveTotal: 0,
+        waveAliveCap: 0,
         spawnTimer: 0,
-        spawnRate: 1.2,
-        timeElapsed: 0,
-        skillSlots: [null, null, null],
+        spawnCadence: 1.0,
+
+        // skills
+        skillSlots: [null, null, null], // keys of active skills
         skillCooldowns: [0, 0, 0],
+        skillLevels: {}, // key -> level (1..15) for actives
+
         paused: false,
         muted: false,
         joystickVec: { x: 0, y: 0 },
@@ -392,6 +458,7 @@
         cameraX: 0,
         cameraY: 0,
         _extraEnemyUpgrades: 0,
+
         onResize(w, h) {
           this.viewW = w;
           this.viewH = h;
@@ -408,20 +475,35 @@
           this.level = 1;
           this.xp = 0;
           this.xpToNext = 20;
-          this.hp = this.maxHp = 100;
-          this.spawnTimer = 0;
-          this.spawnRate = 1.2;
+          this.hp = this.maxHp = 50; // start at 50 HP
           this.timeElapsed = 0;
+
+          // wave reset
+          this.wave = 1;
+          this.waveSpawned = 0;
+          this.waveKills = 0;
+          this.waveTotal = 0;
+          this.waveAliveCap = 0;
+          this.spawnTimer = 0;
+          this.spawnCadence = 1.0;
+
+          // skills reset
           this.skillSlots = [null, null, null];
           this.skillCooldowns = [0, 0, 0];
+          this.skillLevels = {};
+
           this.paused = false;
           this.running = true;
           this._extraEnemyUpgrades = 0;
+
           player.x = this.worldW * 0.5;
           player.y = this.worldH * 0.7;
           player.speed = 160;
           player.dir = { x: 0, y: -1 };
           this.shootTimer = 0;
+          player.shootingAnim = 0;
+          player.invuln = 0;
+
           lastFrame = performance.now();
           if (this.playLoopReq) cancelAnimationFrame(this.playLoopReq);
           this.playLoopReq = requestAnimationFrame(loop);
@@ -429,10 +511,12 @@
           this.decorations.flowers = [];
           this.decorations.insects = [];
           generateDecorations();
+
+          startWave(this.wave);
         },
       };
 
-      /* Player (Orange design) */
+      /* Player */
       const player = {
         x: 960,
         y: 756,
@@ -545,10 +629,22 @@
       window.addEventListener("keydown", (e) => { keys[e.key.toLowerCase()] = true; });
       window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
 
-      /* Enemy spawn */
+      /* Enemy scaling */
+      function enemyBaseStats(type) {
+        // baseline stats per type
+        switch (type) {
+          case "goblin": return { baseHp: 24, baseSpeed: 70 };
+          case "slime":  return { baseHp: 32, baseSpeed: 50 };
+          case "bat":    return { baseHp: 18, baseSpeed: 110 };
+          default:       return { baseHp: 24, baseSpeed: 70 };
+        }
+      }
       function spawnEnemy(count = 1) {
         const types = ["goblin", "slime", "bat"];
         for (let n = 0; n < count; n++) {
+          // Stop if this wave is fully spawned
+          if (game.waveSpawned >= game.waveTotal) return;
+
           const side = Math.floor(Math.random() * 4);
           let x, y;
           const pad = SAFE_MARGIN;
@@ -557,10 +653,14 @@
           else if (side === 2) { x = pad + Math.random() * (game.worldW - pad * 2); y = -40; }
           else { x = pad + Math.random() * (game.worldW - pad * 2); y = game.worldH + 40; }
           const t = types[Math.floor(Math.random() * types.length)];
-          const baseSpeed = 40 + game.level * 6 + Math.random() * 30 + game.timeElapsed * 0.5;
-          const hp = 12 + Math.floor(Math.random() * 22) + game.level * 6;
+          const base = enemyBaseStats(t);
+          const waveFactorHp = 1 + (game.wave - 1) * 0.18; // HP grows 18% per wave
+          const speedFactor = 1 + (game.wave - 1) * 0.02; // slight speed growth
+          const hp = Math.round((base.baseHp + Math.random() * 8) * waveFactorHp);
+          const speed = (base.baseSpeed + Math.random() * 20) * speedFactor;
           const size = 12 + Math.random() * 20;
-          game.enemies.push({ x, y, type: t, speed: baseSpeed, hp, maxHp: hp, r: size, spriteKey: t });
+          game.enemies.push({ x, y, type: t, speed, hp, maxHp: hp, r: size, spriteKey: t });
+          game.waveSpawned++;
         }
       }
 
@@ -572,47 +672,75 @@
       function circleHit(ax, ay, ar, bx, by, br) {
         return (ax - bx) * (ax - bx) + (ay - by) * (ay - by) <= (ar + br) * (ar + br);
       }
-
-      /* Explosions */
-      function createExplosion(x, y, rad, dmg, life = 0.4) {
-        game.explosions.push({ x, y, r: rad, dmg, life, ttl: life });
+      function normalize(x, y) {
+        const m = Math.hypot(x, y) || 1;
+        return { x: x / m, y: y / m };
       }
 
-      /* Skills */
+      /* Damage helpers */
+      function radialDamage(cx, cy, radius, dmg) {
+        for (let i = game.enemies.length - 1; i >= 0; i--) {
+          const e = game.enemies[i];
+          if (circleHit(cx, cy, radius, e.x, e.y, e.r)) {
+            e.hp -= dmg;
+            game.damageTexts.push({ x: e.x, y: e.y - e.r - 6, val: Math.round(dmg), ttl: 0.7, vy: -18 });
+          }
+        }
+      }
+
+      /* Explosions (visual only by default; damage can be instant via radialDamage) */
+      function createExplosion(x, y, rad, life = 0.25, color = "rgba(255,120,80") {
+        game.explosions.push({ x, y, r: rad, life, ttl: life, col: color });
+      }
+
+      /* Active + Passive Skills */
       const ALL_SKILLS = {
-        dash_active: {
-          name: "Dash",
-          desc: "Dash forward, damaging enemies.",
-          type: "active",
-          cooldown: 4,
-          activate() {
-            const dir = normalize(game.joystickVec.x, game.joystickVec.y);
-            const dx = dir.x || player.dir.x, dy = dir.y || player.dir.y;
-            player.x += dx * 80; player.y += dy * 80; clampPlayer();
-            createExplosion(player.x, player.y, 36, 40, 0.12);
-            FarcadeSafe.haptic();
-          },
-        },
-        blast_active: {
-          name: "Blast",
-          desc: "Create area blast around you.",
+        explosion_active: {
+          name: "Explosion",
+          desc: "Blast around you for heavy damage.",
           type: "active",
           cooldown: 6,
-          activate() {
-            createExplosion(player.x, player.y, 80, 999, 0.18);
+          maxLevel: 15,
+          activate(level) {
+            const base = 100 + 20 * Math.max(0, level - 1); // 100 +20/level
+            const mult = 1 + (player._dmg || 0);
+            const dmg = base * mult;
+            createExplosion(player.x, player.y, 90, 0.22);
+            radialDamage(player.x, player.y, 90, dmg); // instant damage
             FarcadeSafe.haptic();
           },
         },
         shield_active: {
           name: "Shield",
-          desc: "Temporary invulnerability.",
+          desc: "Become invincible for a short time.",
           type: "active",
-          cooldown: 10,
-          activate() {
-            player.invuln = 1.2;
+          cooldown: 12,
+          maxLevel: 15,
+          activate(level) {
+            const dur = 5 + 0.5 * Math.max(0, level - 1); // 5s base, +0.5s/level
+            player.invuln = Math.max(player.invuln || 0, dur);
             FarcadeSafe.haptic();
           },
         },
+        dash_active: {
+          name: "Dash",
+          desc: "Dash forward and burst.",
+          type: "active",
+          cooldown: 5,
+          maxLevel: 15,
+          activate(level) {
+            const dir = normalize(game.joystickVec.x || player.dir.x, game.joystickVec.y || player.dir.y);
+            const dashDist = 100 + 6 * Math.max(0, level - 1);
+            player.x += dir.x * dashDist; player.y += dir.y * dashDist; clampPlayer();
+            // minor burst damage around dash end
+            const dmg = Math.round(35 + 3 * Math.max(0, level - 1)) * (1 + (player._dmg || 0));
+            createExplosion(player.x, player.y, 46, 0.14);
+            radialDamage(player.x, player.y, 46, dmg);
+            FarcadeSafe.haptic();
+          },
+        },
+
+        // passives remain simple
         hp_plus_passive: {
           name: "+Max HP",
           desc: "Increase max HP by 20",
@@ -644,14 +772,52 @@
           apply() { player._multishot = (player._multishot || 0) + 1; },
         },
       };
+      const ACTIVE_KEYS = ["explosion_active", "shield_active", "dash_active"];
+
+      function isSkillMaxed(key) {
+        const s = ALL_SKILLS[key];
+        if (!s || s.type !== "active") return false;
+        const lvl = game.skillLevels[key] || 0;
+        return lvl >= (s.maxLevel || 15);
+      }
+      function equippedSlotOf(key) {
+        for (let i = 0; i < 3; i++) if (game.skillSlots[i] === key) return i;
+        return -1;
+      }
+      function hasEmptySkillSlot() {
+        return game.skillSlots.some((s) => s === null);
+      }
 
       function chooseSkillOptions() {
-        const keys = Object.keys(ALL_SKILLS);
+        // Build a pool that obeys active slot/level rules
+        const options = [];
+        const empty = hasEmptySkillSlot();
+
+        // Actives: offer upgrades for equipped actives (not maxed)
+        for (const k of ACTIVE_KEYS) {
+          const equipped = equippedSlotOf(k) >= 0;
+          const maxed = isSkillMaxed(k);
+          if (equipped && !maxed) options.push(k);
+        }
+        // If empty slot(s) exist, allow new active skills (unowned)
+        if (empty) {
+          for (const k of ACTIVE_KEYS) {
+            const equipped = equippedSlotOf(k) >= 0;
+            const maxed = isSkillMaxed(k);
+            if (!equipped && !maxed) options.push(k);
+          }
+        }
+
+        // Add passives always as fillers
+        const passives = Object.keys(ALL_SKILLS).filter((k) => ALL_SKILLS[k].type === "passive");
+        options.push(...passives);
+
+        // Pick up to 3 distinct
         const pick = [];
-        while (pick.length < 3 && keys.length) {
-          const idx = Math.floor(Math.random() * keys.length);
-          const k = keys.splice(idx, 1)[0];
-          pick.push(k);
+        const pool = [...new Set(options)];
+        while (pick.length < 3 && pool.length) {
+          const idx = Math.floor(Math.random() * pool.length);
+          pick.push(pool.splice(idx, 1)[0]);
         }
         return pick;
       }
@@ -680,20 +846,38 @@
           const c = document.createElement("div");
           c.className = "choice";
           c.tabIndex = 0;
-          c.style.minWidth = "88px";
-          c.style.minHeight = "88px";
-          c.innerHTML = `<div style="font-weight:700">${info.name}</div><small style="opacity:.8">${info.type === "active" ? "Active" : "Passive"}</small>`;
+          let subtitle = info.type === "active" ? "Active" : "Passive";
+          if (info.type === "active") {
+            const lvl = game.skillLevels[k] || 0;
+            const max = info.maxLevel || 15;
+            subtitle += ` ${lvl > 0 ? "(Lv " + lvl + ")" : "(New)"}`;
+            if (lvl >= max) subtitle += " (MAX)";
+          }
+          c.innerHTML = `<div style="font-weight:700">${info.name}</div><small style="opacity:.8">${subtitle}</small>`;
           c.addEventListener("click", () => {
             if (info.type === "passive") {
               info.apply && info.apply();
             } else {
-              const slot = game.skillSlots.findIndex((s) => s === null);
-              const useSlot = slot >= 0 ? slot : 0;
-              game.skillSlots[useSlot] = k;
-              game.skillCooldowns[useSlot] = 0;
-              updateSkillButtons();
+              const max = info.maxLevel || 15;
+              const cur = game.skillLevels[k] || 0;
+              if (cur >= max) {
+                // do nothing (it shouldn't appear when maxed)
+              } else if (cur > 0) {
+                // level up existing
+                game.skillLevels[k] = Math.min(max, cur + 1);
+              } else {
+                // equip if empty slot exists
+                const slot = game.skillSlots.findIndex((s) => s === null);
+                if (slot >= 0) {
+                  game.skillSlots[slot] = k;
+                  game.skillCooldowns[slot] = 0;
+                  game.skillLevels[k] = 1;
+                  updateSkillButtons();
+                } else {
+                  // no empty slot; skip (shouldn't be offered)
+                }
+              }
             }
-            game._extraEnemyUpgrades = Math.min(9, (game._extraEnemyUpgrades || 0) + 1);
             document.getElementById("lvlup")?.remove();
             game.paused = false;
           });
@@ -703,26 +887,29 @@
         document.querySelector(".frame").appendChild(wrap);
       }
 
-      /* Skill buttons wiring + new fill UI */
+      /* Skill buttons wiring + fixed label/cooldown handling */
       function updateSkillButtons() {
         for (let i = 0; i < 3; i++) {
           const btn = $(`#skill${i}`);
-          const key = game.skillSlots[i];
+          const label = btn.querySelector(".label");
           const coolDiv = btn.querySelector(".cooler");
+          const key = game.skillSlots[i];
+
           if (!key) {
-            btn.textContent = "";
+            label.textContent = "+";
             btn.style.opacity = 0.6;
             btn.setAttribute("disabled", "true");
-            if (coolDiv) coolDiv.style.setProperty("--fill", "0");
+            coolDiv.style.setProperty("--fill", "0");
             btn.classList.remove("ready");
           } else {
-            btn.textContent = ALL_SKILLS[key].name.split(" ")[0].slice(0, 2).toUpperCase();
+            const short = ALL_SKILLS[key].name.slice(0, 2).toUpperCase();
+            label.textContent = short;
             btn.style.opacity = 1;
             btn.removeAttribute("disabled");
             const cd = game.skillCooldowns[i] || 0;
             const total = ALL_SKILLS[key].cooldown || 4;
             const pct = Math.max(0, Math.min(1, cd / total));
-            coolDiv.style.setProperty("--fill", (1 - pct).toFixed(3)); // fill grows bottom->top as cooldown completes
+            coolDiv.style.setProperty("--fill", (1 - pct).toFixed(3));
             if (pct === 0) btn.classList.add("ready");
             else btn.classList.remove("ready");
           }
@@ -734,8 +921,9 @@
         const skill = ALL_SKILLS[key];
         if (!skill) return;
         if (game.skillCooldowns[i] > 0) return;
+        const lvl = game.skillLevels[key] || 1;
         if (skill.type === "active") {
-          skill.activate();
+          skill.activate(lvl);
           const base = skill.cooldown || 4;
           game.skillCooldowns[i] = base;
           updateSkillButtons();
@@ -747,17 +935,69 @@
         const nx = targetX - x;
         const ny = targetY - y;
         const m = Math.hypot(nx, ny) || 1;
-        const speed = 420;
+        const speed = 460;
         game.bullets.push({
           x, y,
           vx: (nx / m) * speed,
           vy: (ny / m) * speed,
           r: 4,
           dmg,
-          ttl: 3.0,
+          ttl: 2.6,
         });
-        player.shootingAnim = 0.18;
+        player.shootingAnim = 0.22; // slightly longer pull/recoil
         FarcadeSafe.haptic();
+      }
+
+      /* Wave control */
+      function computeWaveSize(wave) {
+        // Starts small, grows steadily, but caps to avoid overwhelming
+        // e.g., 6, 8, 10, ... up to around ~50
+        return Math.min(50, 4 + Math.floor(wave * 2));
+      }
+      function computeAliveCap(wave) {
+        // limit concurrent enemies on screen to avoid swarms
+        return Math.min(18, 6 + Math.floor(wave * 0.7));
+      }
+      function startWave(wave) {
+        game.wave = wave;
+        game.waveSpawned = 0;
+        game.waveKills = 0;
+        game.waveTotal = computeWaveSize(wave);
+        game.waveAliveCap = computeAliveCap(wave);
+        game.spawnCadence = Math.max(0.35, 1.0 - (wave * 0.02));
+        game.spawnTimer = 0.3;
+        updateWaveBar();
+      }
+      function nextWave() {
+        if (game.wave >= game.maxWaves) {
+          // Victory!
+          game.running = false;
+          FarcadeSafe.haptic();
+          FarcadeSafe.gameOver({ score: Math.floor(game.score), victory: true, waves: game.wave });
+          showVictoryOverlay();
+          return;
+        }
+        startWave(game.wave + 1);
+      }
+      function showVictoryOverlay() {
+        const wrap = document.createElement("div");
+        wrap.className = "overlay";
+        wrap.innerHTML = `
+          <div class="choices" style="flex-direction:column;align-items:center;padding:20px">
+            <div style="color:var(--hud);font-weight:800;font-size:18px">You cleared Wave ${game.maxWaves}!</div>
+            <div style="color:var(--hud);opacity:.8;margin-top:6px">Score: ${Math.floor(game.score)}</div>
+          </div>`;
+        document.querySelector(".frame").appendChild(wrap);
+      }
+
+      /* UI wave bar update */
+      function updateWaveBar() {
+        const fill = $("#waveFill");
+        const text = $("#waveText");
+        const total = Math.max(1, game.waveTotal);
+        const pct = Math.min(1, game.waveKills / total);
+        if (fill) fill.style.width = `${pct * 100}%`;
+        if (text) text.textContent = `Wave ${game.wave}/${game.maxWaves} — ${game.waveKills}/${total}`;
       }
 
       /* Update loop */
@@ -799,7 +1039,7 @@
         // auto-fire
         game.shootTimer -= dt;
         const fireRate = 0.3;
-        const autoShootRange = 180;
+        const autoShootRange = 200;
         if (game.shootTimer <= 0) {
           const enemiesInRange = game.enemies
             .map((e) => ({ e, d: Math.hypot(e.x - player.x, e.y - player.y) }))
@@ -812,26 +1052,22 @@
             const baseDmg = Math.round(12 * (1 + (player._dmg || 0)));
             for (const t of targets) {
               const dir = normalize(t.e.x - player.x, t.e.y - player.y);
-              const bx = player.x + dir.x * (player.r + 6);
-              const by = player.y + dir.y * (player.r + 6);
+              const bx = player.x + dir.x * (player.r + 10);
+              const by = player.y + dir.y * (player.r + 10);
               fireBulletTowardsTarget(bx, by, t.e.x, t.e.y, baseDmg);
             }
           }
         }
 
-        // spawn logic
+        // wave spawn: cap concurrent enemies and total per wave
         game.spawnTimer -= dt;
-        if (game.spawnTimer <= 0) {
-          const baseSpawn = 1 + Math.floor(game.level / 4);
-          const spawnAmount = Math.min(10, baseSpawn + (game._extraEnemyUpgrades || 0));
-          spawnEnemy(spawnAmount);
-          game.spawnTimer = Math.max(0.18, game.spawnRate - Math.min(1.2, game.level * 0.06));
+        const alive = game.enemies.length;
+        if (game.spawnTimer <= 0 && alive < game.waveAliveCap && game.waveSpawned < game.waveTotal) {
+          const batch = Math.min(2, game.waveTotal - game.waveSpawned);
+          spawnEnemy(batch);
+          game.spawnTimer = game.spawnCadence;
         }
         game.timeElapsed += dt;
-        if (game.timeElapsed > 8 && Math.random() < dt * 0.4) {
-          const extra = 1 + Math.floor(game.level / 6);
-          spawnEnemy(Math.min(4, extra));
-        }
 
         // bullets
         for (let i = game.bullets.length - 1; i >= 0; i--) {
@@ -845,7 +1081,7 @@
               e.hp -= b.dmg;
               game.damageTexts.push({ x: e.x, y: e.y - e.r - 6, val: b.dmg, ttl: 0.7, vy: -18 });
               b.ttl = -1;
-              createExplosion(b.x, b.y, 10, 0, 0.08);
+              createExplosion(b.x, b.y, 10, 0.08);
               break;
             }
           }
@@ -861,42 +1097,41 @@
           const mag = Math.hypot(dx, dy) || 1;
           e.x += (dx / mag) * e.speed * dt;
           e.y += (dy / mag) * e.speed * dt;
-          // explosions
-          for (let j = game.explosions.length - 1; j >= 0; j--) {
-            const ex = game.explosions[j];
-            if (circleHit(e.x, e.y, e.r, ex.x, ex.y, ex.r)) {
-              const dmg = ex.dmg * (player._dmg ? 1 + player._dmg : 1);
-              e.hp -= dmg * dt * 10;
-              game.damageTexts.push({ x: e.x, y: e.y - e.r - 6, val: Math.round(dmg * dt * 10), ttl: 0.7, vy: -18 });
-            }
-          }
-          // contact
+
+          // contact damage scaled per wave (1 at wave1, +0.2 each wave)
+          const contactDmg = 1 + (game.wave - 1) * 0.2;
+
           if (circleHit(e.x, e.y, e.r, player.x, player.y, player.r + (player.invuln ? 4 : 0))) {
             if (!player.invuln && now / 1000 - game.lastHitTime > 0.5) {
-              game.hp -= Math.max(4, 8 + Math.random() * 6);
+              game.hp -= contactDmg;
               game.lastHitTime = now / 1000;
               FarcadeSafe.haptic();
             }
-            e.hp = -1;
           }
+
           if (e.hp <= 0) {
-            game.score += Math.floor(5 + Math.random() * 8 + game.level * 2);
-            let xpGain = 4 + Math.floor(Math.random() * 6) + Math.floor(game.level * 0.5);
+            game.score += Math.floor(5 + Math.random() * 8 + game.wave * 2);
+            let xpGain = 4 + Math.floor(Math.random() * 6) + Math.floor(game.wave * 0.5);
             if (player._xpBoost) xpGain = Math.floor(xpGain * (1 + player._xpBoost));
             game.pickups.push({ x: e.x, y: e.y, amt: xpGain, ttl: 12, seed: Math.random() });
             game.enemies.splice(i, 1);
+            game.waveKills++;
+            updateWaveBar();
             FarcadeSafe.haptic();
+            if (game.waveKills >= game.waveTotal) {
+              nextWave();
+            }
           }
         }
 
-        // explosions
+        // explosions (visual fade)
         for (let i = game.explosions.length - 1; i >= 0; i--) {
           const ex = game.explosions[i];
           ex.ttl -= dt;
           if (ex.ttl <= 0) game.explosions.splice(i, 1);
         }
 
-        // pickups (XP): no idle jitter; only magnet behavior
+        // pickups (XP)
         for (let i = game.pickups.length - 1; i >= 0; i--) {
           const p = game.pickups[i];
           p.ttl -= dt;
@@ -939,7 +1174,7 @@
           if (btn && coolDiv && key) {
             const total = ALL_SKILLS[key].cooldown || 4;
             const pct = Math.max(0, Math.min(1, game.skillCooldowns[i] / total));
-            coolDiv.style.setProperty("--fill", (1 - pct).toFixed(3)); // bottom->top
+            coolDiv.style.setProperty("--fill", (1 - pct).toFixed(3));
             if (pct === 0) btn.classList.add("ready");
             else btn.classList.remove("ready");
           }
@@ -963,7 +1198,7 @@
         if (game.hp <= 0) {
           game.running = false;
           FarcadeSafe.haptic();
-          FarcadeSafe.gameOver({ score: Math.floor(game.score) });
+          FarcadeSafe.gameOver({ score: Math.floor(game.score), waves: game.wave });
           return;
         }
 
@@ -992,15 +1227,13 @@
           }
         }
 
-        // decorations: detailed trees
+        // decorations
         for (const t of game.decorations.trees) {
           const sx = t.x - camX;
           const sy = t.y - camY;
           if (sx < -120 || sx > vw + 120 || sy < -160 || sy > vh + 120) continue;
           drawDetailedTree(sx, sy, t.s);
         }
-
-        // flowers
         for (const f of game.decorations.flowers) {
           const sx = f.x - camX, sy = f.y - camY;
           if (sx < -20 || sx > vw + 20 || sy < -20 || sy > vh + 20) continue;
@@ -1011,8 +1244,6 @@
           ctx.fillStyle = "rgba(0,0,0,0.12)";
           ctx.fillRect(sx - 1, sy + 3, 2, 4);
         }
-
-        // insects
         for (const ins of game.decorations.insects) {
           const sx = ins.x - camX, sy = ins.y - camY;
           if (sx < -6 || sx > vw + 6 || sy < -6 || sy > vh + 6) continue;
@@ -1026,11 +1257,11 @@
           ctx.fill();
         }
 
-        // explosions
+        // explosions (visual)
         for (const ex of game.explosions) {
           const sx = ex.x - camX, sy = ex.y - camY;
           const t = Math.max(0, ex.ttl / ex.life);
-          ctx.fillStyle = `rgba(255,120,80,${0.12 + 0.28 * t})`;
+          ctx.fillStyle = `${ex.col || "rgba(255,120,80)"}${","}${(0.12 + 0.28 * t)})`;
           ctx.beginPath();
           ctx.arc(sx, sy, ex.r * (1 + (1 - t) * 0.8), 0, Math.PI * 2);
           ctx.fill();
@@ -1049,7 +1280,7 @@
           ctx.restore();
         }
 
-        // pickups (XP) — no wobble, pulsing glow aura
+        // pickups (XP)
         for (const p of game.pickups) {
           const sx = p.x - camX, sy = p.y - camY;
           if (sx < -40 || sx > vw + 40 || sy < -40 || sy > vh + 40) continue;
@@ -1078,7 +1309,7 @@
           ctx.stroke();
         }
 
-        // enemies (pixel sprites)
+        // enemies
         for (const e of game.enemies) {
           const sx = e.x - camX, sy = e.y - camY;
           const sprite = SPRITES[e.spriteKey || e.type] || SPRITES.goblin;
@@ -1088,13 +1319,31 @@
           ctx.fillStyle = "rgba(0,0,0,0.5)";
           ctx.fillRect(sx - e.r, sy - e.r - 8, e.r * 2, 4);
           ctx.fillStyle = "rgba(255,255,255,0.85)";
-          ctx.fillRect(sx - e.r, sy - e.r - 8, (e.hp / e.maxHp) * e.r * 2, 4);
+          ctx.fillRect(sx - e.r, sy - e.r - 8, Math.max(0, (e.hp / e.maxHp)) * e.r * 2, 4);
         }
 
-        // player — Orange with shades
+        // player
         const psx = player.x - camX, psy = player.y - camY;
         drawOrangePlayer(psx, psy);
-        // Bow and arrow on top (kept as requested)
+
+        // Shield visual (noticeable)
+        if (player.invuln > 0) {
+          const t = player.invuln;
+          const alpha = 0.35 + 0.15 * Math.sin(game.timeElapsed * 8);
+          const r = player.r * (1.7 + 0.05 * Math.sin(game.timeElapsed * 6));
+          ctx.save();
+          ctx.globalCompositeOperation = "lighter";
+          const g = ctx.createRadialGradient(psx, psy, r * 0.6, psx, psy, r);
+          g.addColorStop(0, `rgba(80,200,255,${alpha})`);
+          g.addColorStop(1, `rgba(28,167,255,${alpha * 0.5})`);
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(psx, psy, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // bow and arrow (repositioned lower-right and enhanced pull)
         drawPlayerBow(psx, psy);
 
         // damage text
@@ -1125,12 +1374,12 @@
 
         ctx.fillStyle = "rgba(255,255,255,0.6)";
         ctx.font = "11px system-ui, sans-serif";
-        ctx.fillText(`HP: ${Math.floor(game.hp)}/${game.maxHp}`, pad + hpW + 8, pad + 51);
+        ctx.fillText(`HP: ${Math.max(0, Math.floor(game.hp))}/${game.maxHp}`, pad + hpW + 8, pad + 51);
       }
 
       /* Orange player drawing */
       function drawOrangePlayer(cx, cy) {
-        const r = player.r * 1.3; // slightly bigger than old pixel body
+        const r = player.r * 1.3;
         ctx.save();
         ctx.translate(cx, cy);
 
@@ -1140,7 +1389,7 @@
         ctx.ellipse(0, r * 0.9, r * 0.9, r * 0.35, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // orange body with radial gradient
+        // orange body
         const grad = ctx.createRadialGradient(-r * 0.25, -r * 0.5, r * 0.2, 0, 0, r * 1.05);
         grad.addColorStop(0, "#ffd68a");
         grad.addColorStop(0.35, "#ffb24f");
@@ -1162,7 +1411,7 @@
           ctx.fill();
         }
 
-        // little stem
+        // stem
         ctx.strokeStyle = "#4e3a1f";
         ctx.lineWidth = 3;
         ctx.beginPath();
@@ -1170,7 +1419,7 @@
         ctx.lineTo(4, -r - 6);
         ctx.stroke();
 
-        // leaf (rotates slightly with direction)
+        // leaf
         const dir = normalize(player.dir.x || 0, player.dir.y || -1);
         const ang = Math.atan2(dir.y, dir.x);
         ctx.save();
@@ -1187,20 +1436,16 @@
         ctx.fill();
         ctx.restore();
 
-        // sunglasses (white frames, orange lenses)
+        // sunglasses
         ctx.save();
         ctx.translate(0, -r * 0.1);
         ctx.rotate(ang * 0.05);
         const lensW = r * 0.75, lensH = r * 0.34;
         const pad = 3;
-        // left frame
         roundedRect(-lensW - pad, -lensH, lensW, lensH * 2, 9, "#ffffff");
-        // right frame
         roundedRect(pad, -lensH, lensW, lensH * 2, 9, "#ffffff");
-        // bridge
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(-pad, -3, pad * 2, 6);
-        // lenses
         ctx.globalAlpha = 0.9;
         roundedRect(-lensW - pad + 3, -lensH + 3, lensW - 6, lensH * 2 - 6, 7, "#ff6a00");
         roundedRect(pad + 3, -lensH + 3, lensW - 6, lensH * 2 - 6, 7, "#ff6a00");
@@ -1222,14 +1467,24 @@
         }
       }
 
-      /* Bow and arrow (kept) */
+      /* Bow and arrow (repositioned lower-right; enhanced pull) */
       function drawPlayerBow(cx, cy) {
-        ctx.save();
-        ctx.translate(cx, cy);
         const dir = normalize(player.dir.x || 0, player.dir.y || -1);
         const ang = Math.atan2(dir.y, dir.x);
-        ctx.translate(0, -2);
+        const perp = { x: -dir.y, y: dir.x }; // right side relative to facing
+        // offset to right side and slightly lower in screen space
+        const holdOffsetX = perp.x * 10 + dir.x * 6;
+        const holdOffsetY = perp.y * 10 + dir.y * 6 + 6;
+
+        ctx.save();
+        ctx.translate(cx + holdOffsetX, cy + holdOffsetY);
         ctx.rotate(ang);
+
+        // slight recoil/tilt when shooting
+        const pullNorm = Math.min(1, player.shootingAnim / 0.22);
+        const recoilTilt = -0.06 * pullNorm;
+        ctx.rotate(recoilTilt);
+
         // bow body
         ctx.strokeStyle = "#3a2a1f";
         ctx.lineWidth = 3;
@@ -1240,14 +1495,14 @@
         ctx.strokeStyle = "#cfcfcf";
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(-4, -9);
-        ctx.lineTo(-4, 9);
+        ctx.moveTo(-4 - 2 * pullNorm, -9);
+        ctx.lineTo(-4 - 2 * pullNorm, 9);
         ctx.stroke();
-        // small "arm" nub touching the orange
+        // small arm nub
         ctx.fillStyle = "#ffb24f";
         ctx.fillRect(-10, -3, 6, 6);
-        // arrow
-        const pull = player.shootingAnim > 0 ? 6 * (player.shootingAnim / 0.18) : 0;
+        // arrow (pulled back based on shootingAnim)
+        const pull = 10 * pullNorm;
         ctx.strokeStyle = "#6b3b1f";
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -1261,6 +1516,7 @@
         ctx.lineTo(8, 3);
         ctx.closePath();
         ctx.fill();
+
         ctx.restore();
       }
 
@@ -1276,7 +1532,7 @@
         ctx.ellipse(0, 32, 26, 10, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // trunk with gradient + bark notches
+        // trunk
         const tg = ctx.createLinearGradient(0, 0, 0, 38);
         tg.addColorStop(0, "#7a4e2a");
         tg.addColorStop(1, "#5e3a1d");
@@ -1289,22 +1545,15 @@
         ctx.moveTo(3, 16); ctx.lineTo(3, 24);
         ctx.stroke();
 
-        // layered canopy
+        // canopy
         const leafDark = "#0f5a2a";
         const leafMid = "#1a7a39";
         const leafLight = "#2ecf6f";
+        blobby(-26, 0, 22, leafDark); blobby(0, -8, 26, leafDark); blobby(26, 0, 22, leafDark);
+        blobby(-18, -14, 18, leafMid); blobby(0, -20, 20, leafMid); blobby(18, -14, 18, leafMid);
+        blobby(0, -28, 14, leafLight);
 
-        // bottom layer
-        ctx.fillStyle = leafDark;
-        blobby(-26, 0, 22); blobby(0, -8, 26); blobby(26, 0, 22);
-        // mid layer
-        ctx.fillStyle = leafMid;
-        blobby(-18, -14, 18); blobby(0, -20, 20); blobby(18, -14, 18);
-        // top highlight layer
-        ctx.fillStyle = leafLight;
-        blobby(0, -28, 14);
-
-        // tiny fruits
+        // fruits
         ctx.fillStyle = "#ff7a1e";
         for (let i = 0; i < 3; i++) {
           const ox = (-12 + i * 12) + (Math.random() * 4 - 2);
@@ -1316,17 +1565,12 @@
 
         ctx.restore();
 
-        function blobby(cx, cy, r) {
+        function blobby(cx, cy, r, fill) {
+          ctx.fillStyle = fill;
           ctx.beginPath();
           ctx.ellipse(cx, cy, r * 1.1, r * 0.9, (cx + cy) * 0.02, 0, Math.PI * 2);
           ctx.fill();
         }
-      }
-
-      /* Normalization helper */
-      function normalize(x, y) {
-        const m = Math.hypot(x, y) || 1;
-        return { x: x / m, y: y / m };
       }
 
       /* Wire skill buttons */
@@ -1345,6 +1589,8 @@
       /* Farcade events */
       FarcadeSafe.on && FarcadeSafe.on("play_again", () => {
         document.getElementById("lvlup")?.remove();
+        const overlays = document.querySelectorAll(".overlay");
+        overlays.forEach((o) => o.remove());
         game.reset();
       });
       FarcadeSafe.on && FarcadeSafe.on("toggle_mute", ({ isMuted }) => {
@@ -1415,7 +1661,7 @@
         setTimeout(boot, 60);
       });
 
-      /* UI loop: XP bar + skill fill */
+      /* UI loop: XP bar + skill fill + wave bar */
       (function uiLoop() {
         const bar = $("#xpbar");
         if (bar) bar.style.width = `${Math.min(100, (game.xp / game.xpToNext) * 100)}%`;
@@ -1430,6 +1676,7 @@
           if (pct === 0) btn.classList.add("ready");
           else btn.classList.remove("ready");
         }
+        updateWaveBar();
         requestAnimationFrame(uiLoop);
       })();
 
