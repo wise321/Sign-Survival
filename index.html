@@ -21,7 +21,7 @@
     .joystick { display: none; }
     .skills { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; width: 140px; align-items: flex-end; pointer-events:auto; }
 
-    /* Level-up overlay */
+    /* Overlay (level-up) */
     .overlay { position: absolute; inset: 0; background: rgba(2, 6, 23, 0.6); display: flex; align-items: center; justify-content: center; pointer-events: auto; z-index: 8; }
     .choices { display: flex; gap: 12px; padding: 12px; background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
     .choice { width: 88px; height: 100px; min-width: 88px; min-height: 100px; background: #0f1724; border-radius: 10px; color: var(--hud); font-size: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border: 2px solid rgba(255,255,255,0.06); cursor: pointer; padding: 6px 4px; }
@@ -37,7 +37,7 @@
     .skill-btn.ready { box-shadow: 0 0 24px rgba(255,158,43,.55), 0 10px 16px rgba(0,0,0,.5); }
     .skill-btn[disabled] { opacity: .48; pointer-events: none; }
 
-    /* Wave bar (taller so text isn't cut; two-line columns) */
+    /* Wave bar (taller so text isn't cut) */
     .wavebar-wrap { position: absolute; top: 14px; left: 0; right: 0; pointer-events: none; z-index: 12; padding-left: 200px; padding-right: 16px; }
     .wavebar { margin: 0 auto; width: 76%; max-width: 360px; height: 34px; background: rgba(255,255,255,.12); border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,.15); position: relative; }
     .wavebar-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: linear-gradient(90deg, #35d0de, #1ca7ff); transition: width 120ms linear; z-index: 1; }
@@ -105,7 +105,7 @@
         </div>
       </div>
 
-      <!-- Bottom level indicator removed on purpose -->
+      <!-- Bottom level indicator intentionally removed -->
       <!-- <div class="xpbar-wrap"><div class="xpbar" id="xpbar"></div></div> -->
 
       <!-- Start overlay -->
@@ -224,10 +224,10 @@
       game.onResize(rect.width, rect.height);
     }
 
-    /* Optional custom enemy images + main player with black chroma key */
-    const CUSTOM_SPRITE_CANVAS = {};
-    let CUSTOM_MAIN_SPRITE = null;
-    let TREE_ATLAS = null; // optional external tree sprite sheet (trees.png)
+    /* Optional custom images with black chroma key */
+    const CUSTOM_SPRITE_CANVAS = {};    // enemies
+    let CUSTOM_MAIN_SPRITE = null;      // player
+    const CUSTOM_TREE_CANVAS = {};      // trees: tree1..tree4
 
     function loadChromaImage(src, key=[0,0,0], tol=40) {
       return new Promise((resolve) => {
@@ -263,13 +263,14 @@
       const c = await loadChromaImage("orange.jpg");
       if (c) CUSTOM_MAIN_SPRITE = c;
     }
-    async function loadOptionalTreeAtlas() {
-      // If a trees.png is present (like the attached), load and chroma-key black
-      const c = await loadChromaImage("trees.png");
-      if (c) TREE_ATLAS = c;
+    async function loadOptionalTreeImages() {
+      for (let i = 1; i <= 4; i++) {
+        const c = await loadChromaImage(`tree${i}.jpg`);
+        if (c) CUSTOM_TREE_CANVAS[`tree${i}`] = c;
+      }
     }
 
-    /* Pixel fallback sprites */
+    /* Pixel fallback sprites (enemies) */
     const SPRITES = {
       enemy1: [
         [null, null, "#16321a", "#16321a", null],
@@ -540,18 +541,18 @@
       for (let i = 0; i < 3; i++) {
         const btn = document.getElementById(`skill${i}`);
         const cool = btn.querySelector(".cooler");
-        const ring = btn.querySelector(".ring");
+        theRing = btn.querySelector(".ring");
         const icon = document.getElementById(`icon${i}`);
         const key = game.skillSlots[i];
 
         if (!key) {
           icon.innerHTML = ""; btn.style.opacity = 0.6; btn.setAttribute("disabled","true");
-          cool.style.setProperty("--active","0"); ring.style.setProperty("--cool","0"); btn.classList.remove("ready");
+          cool.style.setProperty("--active","0"); theRing.style.setProperty("--cool","0"); btn.classList.remove("ready");
         } else {
           icon.innerHTML = skillIconSVG(key, 26); btn.style.opacity = 1; btn.removeAttribute("disabled");
           const cd = game.skillCooldowns[i] || 0; const totalCd = ALL_SKILLS[key].cooldown || 4;
           const coolPct = 1 - Math.max(0, Math.min(1, cd / totalCd));
-          ring.style.setProperty("--cool", String(coolPct));
+          theRing.style.setProperty("--cool", String(coolPct));
           const at = game.skillActiveTimers[i] || 0, atTot = game.skillActiveTotals[i] || 1;
           const activePct = Math.max(0, Math.min(1, at / atTot));
           cool.style.setProperty("--active", String(activePct));
@@ -639,6 +640,7 @@
       const W = game.worldW, H = game.worldH;
       game.world.trees = []; game.world.houses = []; game.world.flowers = []; game.world.roads = [];
 
+      // roads and houses
       game.world.roads.push({ pts: [ { x: -120, y: H + 80 }, { x: W * 0.22, y: H * 0.72 }, { x: W * 0.45, y: H * 0.52 }, { x: W * 0.66, y: H * 0.34 }, { x: W + 120, y: -80 } ], width: 46 });
       game.world.roads.push({ pts: [ { x: W * 0.40, y: H * 0.60 }, { x: W * 0.32, y: H * 0.40 }, { x: W * 0.20, y: H * 0.22 }, { x: -120,  y: H * 0.12 } ], width: 38 });
 
@@ -650,19 +652,28 @@
       ];
       game.world.houses.push(...houseSpots);
 
-      // New: richer variety of trees (keeps roads/houses clear)
+      // Trees: ensure spacing; 4 types distributed randomly
       const treeCount = 220;
+      const minDist = 60; // pixels between trees (world space) — farther apart
       let tries = 0;
-      while (game.world.trees.length < treeCount && tries < treeCount * 25) {
+      function farFromTrees(x, y) {
+        for (const t of game.world.trees) {
+          const dx = x - t.x, dy = y - t.y;
+          if (dx*dx + dy*dy < minDist*minDist) return false;
+        }
+        return true;
+      }
+      while (game.world.trees.length < treeCount && tries < treeCount * 40) {
         tries++;
         const x = Math.random() * W, y = Math.random() * H, s = 0.9 + Math.random() * 0.8;
+        if (!farFromTrees(x, y)) continue;
         if (nearAnyHouse(x, y, 110)) continue;
         if (nearAnyRoad(x, y, 24)) continue;
-        const type = Math.floor(Math.random() * 5); // 5 styles
+        const type = Math.floor(Math.random() * 4); // 4 distinct types
         game.world.trees.push({ x, y, s, type });
       }
 
-      // flowers (small ground specks)
+      // flowers (small specks)
       for (let i = 0; i < 700; i++) {
         const x = Math.random() * W, y = Math.random() * H;
         game.world.flowers.push({ x, y, c: Math.random() < 0.33 ? "#ffd166" : (Math.random() < 0.5 ? "#ff7ac9" : "#ffffff") });
@@ -700,7 +711,7 @@
 
       game.timeElapsed += dt;
 
-      // input/movement (keyboard or drag)
+      // input/movement
       const kbX = (keys["arrowright"] || keys["d"] ? 1 : 0) - (keys["arrowleft"] || keys["a"] ? 1 : 0);
       const kbY = (keys["arrowdown"] || keys["s"] ? 1 : 0) - (keys["arrowup"] || keys["w"] ? 1 : 0);
       let ix = game.joystickVec.x || kbX, iy = game.joystickVec.y || kbY;
@@ -788,7 +799,7 @@
         }
       }
 
-      // fx
+      // fx particles
       for (let i = game.explosions.length - 1; i >= 0; i--) { const ex = game.explosions[i]; ex.ttl -= dt; if (ex.ttl <= 0) game.explosions.splice(i, 1); }
       for (let i = game.fxParticles.length - 1; i >= 0; i--) {
         const p = game.fxParticles[i]; p.ttl -= dt;
@@ -798,7 +809,7 @@
         if (p.ttl <= 0 || p.alpha <= 0) game.fxParticles.splice(i, 1);
       }
 
-      // pickups
+      // pickups: tiny "Sign" orange-metallic text (replaces orb)
       for (let i = game.pickups.length - 1; i >= 0; i--) {
         const p = game.pickups[i]; p.ttl -= dt;
         const dx = player.x - p.x, dy = player.y - p.y, d = Math.hypot(dx, dy), magnetRange = 120;
@@ -873,7 +884,7 @@
         ctx.restore();
       }
 
-      // pickups: tiny "Sign" orange-metallic text
+      // pickups: tiny "Sign" word (orange metallic)
       for (const p of game.pickups) {
         const sx = p.x - camX, sy = p.y - camY;
         const lg = ctx.createLinearGradient(sx-10, sy, sx+10, sy);
@@ -937,7 +948,7 @@
       ctx.fillStyle = "#ff6b6b"; ctx.fillRect(pad, pad + 38, barW * (Math.max(0, game.hp) / game.maxHp), barH);
       ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.strokeRect(pad, pad + 38, barW, barH);
 
-      // Level label and bar (kept in the top-left HUD)
+      // Level label and bar
       ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "12px system-ui, sans-serif";
       ctx.fillText(`Level ${game.level}`, pad, pad + 60);
       const lvPct = Math.min(1, game.xp / Math.max(1, game.xpToNext));
@@ -1006,30 +1017,31 @@
       ctx.restore();
     }
 
-    // Draw detailed, textured trees with 5 styles (uses trees.png if available as a single decorative overlay)
+    // Detailed trees; no ground shadow; supports custom tree1..tree4.jpg
     function drawFancyTree(x, y, s=1, type=0) {
       ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(s, s);
 
-      // ground shadow
-      ctx.fillStyle = "rgba(0,0,0,0.22)";
-      ctx.beginPath(); ctx.ellipse(0, 14, 16, 6, 0, 0, Math.PI*2); ctx.fill();
-
-      switch (type % 5) {
-        case 0: drawBroadleaf(); break;     // round lush
-        case 1: drawTallBroadleaf(); break; // tall lush
-        case 2: drawConifer(); break;       // pine
-        case 3: drawBareTree(); break;      // dead tree
-        case 4: drawBushy(); break;         // bush cluster
+      // If custom image exists for this type, draw it (remove black already via chroma)
+      const key = `tree${(type % 4) + 1}`;
+      const img = CUSTOM_TREE_CANVAS[key];
+      if (img) {
+        // Draw so that the bottom sits near y=8 (trunk base), centered horizontally
+        const desiredH = 48; // base height in local units before scaling
+        const aspect = img.width / img.height || 1;
+        const h = desiredH;
+        const w = desiredH * aspect;
+        ctx.drawImage(img, Math.floor(-w/2), Math.floor(-h + 8), Math.floor(w), Math.floor(h));
+        ctx.restore();
+        return;
       }
 
-      // optional subtle highlight from atlas if present (adds texture)
-      if (TREE_ATLAS) {
-        ctx.globalAlpha = 0.18;
-        const w = 36, h = 36;
-        ctx.drawImage(TREE_ATLAS, 0, 0, TREE_ATLAS.width, TREE_ATLAS.height, -w, -w-10, w*2, h*2);
-        ctx.globalAlpha = 1;
+      // Fallback vector trees (no ground shadow)
+      switch (type % 4) {
+        case 0: drawBroadleaf(); break;
+        case 1: drawTallBroadleaf(); break;
+        case 2: drawConifer(); break;
+        case 3: drawBareTree(); break;
       }
-
       ctx.restore();
 
       function trunk(h=20, w=6) {
@@ -1037,7 +1049,6 @@
         g.addColorStop(0, "#7a4b25"); g.addColorStop(1, "#4e2f18");
         ctx.fillStyle = g;
         ctx.fillRect(-w/2, -2, w, h);
-        // bark lines
         ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1;
         for (let i=0;i<3;i++){ ctx.beginPath(); ctx.moveTo(-w/2+1, 2+i*6); ctx.lineTo(w/2-1, 2+i*6); ctx.stroke(); }
       }
@@ -1046,7 +1057,6 @@
         const rg = ctx.createRadialGradient(-6, -8, r*0.2, 0, 0, r);
         rg.addColorStop(0, light); rg.addColorStop(0.6, base); rg.addColorStop(1, dark);
         ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(0, -10, r, 0, Math.PI*2); ctx.fill();
-        // texture dots
         ctx.fillStyle = "rgba(255,255,255,0.18)";
         for (let i=0;i<16;i++){ const a=Math.random()*Math.PI*2; const rr=r*(0.2+Math.random()*0.75); ctx.fillRect(Math.cos(a)*rr-1, -10+Math.sin(a)*rr-1, 2, 2); }
       }
@@ -1069,17 +1079,11 @@
         ctx.fillStyle="#2d8b3e"; ctx.beginPath(); ctx.arc(0, -14-layers*6-3, 3, 0, Math.PI*2); ctx.fill();
       }
       function drawBareTree() {
-        // trunk
         trunk(26,6);
-        // branches
         ctx.strokeStyle="#4e2f18"; ctx.lineWidth=2;
         ctx.beginPath();
         ctx.moveTo(0, -2); ctx.lineTo(-10, -16); ctx.moveTo(-2,-6); ctx.lineTo(10,-20); ctx.moveTo(2,-10); ctx.lineTo(14,-28);
         ctx.stroke();
-      }
-      function drawBushy() {
-        trunk(16,5);
-        ctx.save(); leafBlob(12, 110); ctx.translate(-10,-2); leafBlob(9, 105); ctx.translate(20,-1); leafBlob(9, 115); ctx.restore();
       }
     }
 
@@ -1182,7 +1186,7 @@
       for (let i = 0; i < 3; i++) $("#icon"+i).innerHTML = "";
       loadOptionalEnemyImages();
       loadOptionalMainSprite();
-      loadOptionalTreeAtlas();
+      loadOptionalTreeImages();
       setTimeout(() => FarcadeSafe.ready(), 250);
     }
     function startGame() {
