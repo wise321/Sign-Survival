@@ -15,14 +15,13 @@
     * { box-sizing: border-box; -webkit-user-select: none; user-select: none; touch-action: none; }
     .wrap { width: 100%; max-width: 400px; margin: 14px auto; position: relative; }
     .frame { position: relative; width: 100%; padding-top: 177.7778%; overflow: hidden; border-radius: 12px; background: #000; }
-    canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; background:#7ccb53; }
+    canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; background:#7ccb53; cursor: crosshair; }
 
     .touch-layer { position: absolute; inset: 0; pointer-events: none; }
-    .joystick, .skills { position: absolute; pointer-events: auto; }
-    .joystick { left: 12px; bottom: 12px; width: 140px; height: 140px; }
-    .skills { right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; width: 140px; align-items: flex-end; }
+    .joystick { display: none; } /* hidden as requested */
+    .skills { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; width: 140px; align-items: flex-end; pointer-events:auto; }
 
-    /* Overlay (reverted clean design for level-up) */
+    /* Overlay (clean level-up design) */
     .overlay { position: absolute; inset: 0; background: rgba(2, 6, 23, 0.6); display: flex; align-items: center; justify-content: center; pointer-events: auto; z-index: 8; }
     .choices {
       display: flex; gap: 12px; padding: 12px;
@@ -46,13 +45,12 @@
       display: grid; place-items: center; color: white; font-weight: 800; font-size: 16px;
       border: 0; position: relative; overflow: hidden; isolation: isolate;
     }
-    .skill-btn::before { /* glossy top */
+    .skill-btn::before {
       content: ""; position: absolute; inset: 0; border-radius: 14px;
       background: radial-gradient(90% 70% at 50% 0%, rgba(255,255,255,.35) 0%, rgba(255,255,255,.02) 70%);
       mix-blend-mode: screen; pointer-events: none;
     }
     .skill-btn .icon { position: relative; z-index: 3; width: 26px; height: 26px; filter: drop-shadow(0 1px 0 rgba(0,0,0,.5)); }
-    /* Active duration fill — high contrast + diagonal stripes */
     .skill-btn .cooler {
       position: absolute; inset: 0; border-radius: 14px; pointer-events: none; overflow: hidden; z-index: 1;
       box-shadow: inset 0 0 0 2px rgba(0,0,0,.28), inset 0 6px 18px rgba(0,0,0,.35);
@@ -63,10 +61,8 @@
       background:
         repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 6px, rgba(255,255,255,0) 6px 12px),
         linear-gradient(180deg, rgba(48,237,255,.35), rgba(28,167,255,.22));
-      transition: height 100ms linear;
-      mix-blend-mode: screen;
+      transition: height 100ms linear; mix-blend-mode: screen;
     }
-    /* Cooldown ring */
     .skill-btn .ring {
       position: absolute; inset: -4px; border-radius: 50%; z-index: 2; pointer-events: none;
       background: conic-gradient(rgba(255,255,255,.96) calc(var(--cool,0) * 360deg), rgba(255,255,255,.15) 0);
@@ -85,43 +81,52 @@
       background: rgba(0,0,0,.35); box-shadow: 0 8px 18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.08);
       z-index:-1;
     }
-    /* XP bar leaves room on the right for the skills column so it doesn't overlap the 3rd button */
+    /* XP bar leaves room on the right for the skills column */
     .xpbar-wrap {
       position: absolute; left: 8%; right: calc(8% + 160px); bottom: 8px;
       height: 12px; background: rgba(255,255,255,0.08); border-radius: 8px; overflow: hidden;
     }
     .xpbar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); width: 0%; }
 
-    /* Wave bar bigger, padded left so it does not overlap health/score plate */
-    .wavebar-wrap { position: absolute; top: 8px; left: 0; right: 0; pointer-events: none; z-index: 5; padding-left: 190px; padding-right: 16px; }
-    .wavebar {
-      margin: 0 auto; width: 78%; max-width: 360px; height: 22px;
-      background: rgba(255,255,255,.12); border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,.15);
-    }
+    /* Wave bar bigger and clear of left HUD plate */
+    .wavebar-wrap { position: absolute; top: 10px; left: 0; right: 0; pointer-events: none; z-index: 5; padding-left: 260px; padding-right: 16px; }
+    .wavebar { margin: 0 auto; width: 76%; max-width: 360px; height: 24px; background: rgba(255,255,255,.12); border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,.15); }
     .wavebar-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: linear-gradient(90deg, #35d0de, #1ca7ff); transition: width 120ms linear; }
     .wavebar-text { position: absolute; inset: 0; display: grid; place-items: center; color: var(--hud); font: 12px system-ui, sans-serif; text-shadow: 0 1px 0 rgba(0,0,0,.7); }
 
-    /* Start overlay */
+    /* Start overlay with animated light strip and subtle diagonal pattern */
     .start-overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(8, 10, 18, .8); z-index: 10; }
     .start-card {
-      position: relative; width: 78%; max-width: 320px; padding: 22px 16px 18px;
+      position: relative; width: 82%; max-width: 330px; padding: 22px 16px 18px;
       background: linear-gradient(180deg, #ffb255, #ff7a1e);
       border-radius: 14px;
       box-shadow: 0 20px 40px rgba(0,0,0,.55), inset 0 0 0 2px rgba(255,255,255,.2);
-      color: #230e00; text-align: center;
+      color: #230e00; text-align: center; overflow: hidden;
     }
-    .start-card::before { /* light strip */
-      content: ""; position: absolute; left: 8%; right: 8%; top: 36%;
-      height: 8px; border-radius: 6px;
-      background: linear-gradient(90deg, rgba(255,255,255,.7), rgba(255,255,255,.15));
+    .start-card::after {
+      content:""; position:absolute; inset:0;
+      background: repeating-linear-gradient(135deg, rgba(255,255,255,.15) 0 6px, rgba(255,255,255,0) 6px 16px);
+      opacity:.25; pointer-events:none;
+    }
+    .start-strip {
+      position:absolute; left: 6%; right: 6%; top: 34%;
+      height: 9px; border-radius: 6px;
+      background: linear-gradient(90deg, rgba(255,255,255,.8), rgba(255,255,255,.2));
       filter: blur(0.5px);
     }
-    .start-title { font: 800 20px/1.2 system-ui, sans-serif; letter-spacing: .5px; text-shadow: 0 2px 0 rgba(255,255,255,.4); color:#3a1d00; }
-    .start-by { margin-top: 12px; font: 600 12px/1 system-ui, sans-serif; opacity: .9; color:#4a2500; } /* moved lower */
-    .start-decor {
-      position:absolute; inset:8px; border-radius:10px; pointer-events:none;
-      box-shadow: inset 0 0 0 2px rgba(255,255,255,.25), inset 0 0 18px rgba(255,255,255,.15);
+    .start-title {
+      position: relative; font: 800 20px/1.2 system-ui, sans-serif; letter-spacing: .5px; color:#3a1d00;
+      text-shadow: 0 2px 0 rgba(255,255,255,.4);
     }
+    .start-title::after {
+      content:""; position:absolute; left:-120%; top:0; height:100%; width:120%;
+      background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.8) 50%, rgba(255,255,255,0) 100%);
+      mix-blend-mode: screen; filter: blur(1px); transform: skewX(-20deg);
+      animation: shine 2.8s linear infinite;
+    }
+    @keyframes shine { to { left:120%; } }
+    .start-by { margin-top: 14px; font: 600 12px/1 system-ui, sans-serif; opacity: .9; color:#4a2500; }
+    .start-decor { position:absolute; inset:8px; border-radius:10px; pointer-events:none; box-shadow: inset 0 0 0 2px rgba(255,255,255,.25), inset 0 0 18px rgba(255,255,255,.15); }
     .start-btn {
       margin-top: 14px; padding: 10px 18px; border: 0; border-radius: 10px; color: white; font-weight: 800;
       background: linear-gradient(180deg, #ff9a3c, #ff6a00);
@@ -130,11 +135,10 @@
     .start-btn:active { transform: translateY(1px); }
 
     @media (max-width: 340px) {
-      .joystick { width: 120px; height: 120px; }
       .skills { width: 120px; }
       .skill-btn { width: 52px; height: 52px; }
-      .wavebar-wrap { padding-left: 170px; }
-      .wavebar { width: 84%; max-width: 300px; height: 20px; }
+      .wavebar-wrap { padding-left: 230px; }
+      .wavebar { width: 82%; max-width: 300px; height: 22px; }
       .wavebar-text { font-size: 11px; }
       .xpbar-wrap { left: 8%; right: calc(8% + 140px); bottom: 8px; }
     }
@@ -174,6 +178,7 @@
       <div class="start-overlay" id="startOverlay">
         <div class="start-card">
           <div class="start-decor"></div>
+          <div class="start-strip"></div>
           <div class="start-title">Welcome to Sign Survival</div>
           <div class="start-by">Created by Agrigorn</div>
           <button class="start-btn" id="startBtn">Start</button>
@@ -194,16 +199,16 @@
       };
     })();
 
-    /* Tiny in-page audio (no imports) — 3 background tracks + calmer shot */
+    /* WebAudio — 3 chiptune-like tracks */
     const Snd = {
       ctx: null, gain: null, musicGain: null, muted: false,
-      musicTimer: null, rotateTimer: null, trackIdx: 0, bpm: 100,
+      musicTimer: null, rotateTimer: null, trackIdx: 0,
       init() {
         if (this.ctx) return;
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         this.ctx = ctx;
-        const g = ctx.createGain(); g.gain.value = 0.25; g.connect(ctx.destination); this.gain = g;
-        const mg = ctx.createGain(); mg.gain.value = 0.12; mg.connect(ctx.destination); this.musicGain = mg;
+        const g = ctx.createGain(); g.gain.value = 0.28; g.connect(ctx.destination); this.gain = g;
+        const mg = ctx.createGain(); mg.gain.value = 0.24; mg.connect(ctx.destination); this.musicGain = mg;
       },
       now() { return this.ctx ? this.ctx.currentTime : 0; },
       osc(type="sine", freq=440, dur=0.12, vol=0.1, dest='gain', attack=0.01, release=0.06) {
@@ -216,7 +221,7 @@
         o.connect(g); g.connect(this[dest] || this.gain);
         o.start(t0); o.stop(t0 + Math.max(dur, attack) + release + 0.02);
       },
-      noise(dur=0.08, vol=0.15, hp=600) { // filtered noise puff for calmer shot
+      noise(dur=0.08, vol=0.15, hp=700) {
         if (!this.ctx || this.muted) return;
         const ctx = this.ctx, t0 = this.now();
         const bufferSize = Math.floor(ctx.sampleRate * dur);
@@ -231,43 +236,32 @@
         g.gain.setValueAtTime(vol, t0);
         g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.05);
       },
-      playShot() {
-        // soft triangle click + filtered noise puff
-        this.osc("triangle", 520, 0.07, 0.08, 'gain', 0.005, 0.06);
-        this.noise(0.06, 0.08, 900);
-      },
-      playExplode() { this.noise(0.2, 0.28, 120); this.osc("sine", 140, 0.16, 0.09, 'gain', 0.005, 0.14); },
+      playShot() { this.osc("triangle", 520, 0.07, 0.07, 'gain', 0.005, 0.06); this.noise(0.05, 0.07, 900); },
+      playExplode() { this.noise(0.2, 0.26, 160); this.osc("sine", 160, 0.14, 0.08, 'gain', 0.005, 0.12); },
       playPickup() { this.osc("triangle", 1000, 0.12, 0.08, 'gain', 0.01, 0.08); },
-
       setTrack(i=0) {
         if (!this.ctx) return;
         if (this.musicTimer) { clearInterval(this.musicTimer); this.musicTimer = null; }
         this.trackIdx = ((i % 3) + 3) % 3;
-        const bpm = [92, 105, 88][this.trackIdx];
-        this.bpm = bpm;
-        const stepMs = Math.round((60 / bpm) * 1000 / 2); // eighth-notes
-
         let step = 0;
+        const stepMs = [330, 300, 360][this.trackIdx];
         const play = () => {
           if (this.muted) return;
-          // Three distinct vibes
           if (this.trackIdx === 0) {
-            // airy pad arps
-            const seq = [220, 277, 330, 440, 196, 247, 294, 392];
-            const f = seq[step % seq.length];
-            this.osc("sine", f, 0.15, 0.05, 'musicGain', 0.01, 0.12);
-            this.osc("triangle", f*2, 0.15, 0.04, 'musicGain', 0.01, 0.12);
+            const arp = [262, 330, 392, 523, 330, 392, 494, 659];
+            const f = arp[step % arp.length];
+            this.osc("square", f, 0.16, 0.05, 'musicGain', 0.01, 0.12);
+            if (step % 2 === 0) this.osc("triangle", f*2, 0.12, 0.04, 'musicGain', 0.008, 0.1);
           } else if (this.trackIdx === 1) {
-            // mellow groove: bass + gentle ping
-            const bass = [165, 185, 196, 147][Math.floor(step/4) % 4];
-            if (step % 2 === 0) this.osc("sine", bass, 0.22, 0.05, 'musicGain', 0.01, 0.18);
-            const ping = [660, 740, 660, 550][step % 4];
-            this.osc("triangle", ping, 0.08, 0.035, 'musicGain', 0.005, 0.06);
+            const bass = [196, 220, 247, 196][Math.floor(step/4) % 4];
+            if (step % 2 === 0) this.osc("sine", bass, 0.22, 0.06, 'musicGain', 0.01, 0.18);
+            const lead = [523, 587, 659, 587, 523, 494, 523, 587][step % 8];
+            this.osc("triangle", lead, 0.14, 0.045, 'musicGain', 0.008, 0.12);
           } else {
-            // calm chords broken up
-            const chord = [[220, 277, 330], [196, 247, 294], [233, 294, 349], [174, 220, 262]][Math.floor(step/4) % 4];
+            const chord = [[233, 294, 349], [196, 247, 294], [262, 330, 392], [220, 277, 330]][Math.floor(step/4) % 4];
             const note = chord[step % 3];
-            this.osc("sine", note, 0.18, 0.05, 'musicGain', 0.01, 0.12);
+            this.osc("sine", note, 0.18, 0.055, 'musicGain', 0.01, 0.14);
+            if (step % 4 === 0) this.noise(0.03, 0.05, 1500);
           }
           step++;
         };
@@ -278,7 +272,6 @@
         if (!this.ctx || this.muted) return;
         if (!this.musicTimer) this.setTrack(0);
         if (this.rotateTimer) clearInterval(this.rotateTimer);
-        // rotate track every 45 seconds
         this.rotateTimer = setInterval(() => this.nextTrack(), 45000);
       },
       stopMusic() { if (this.musicTimer) { clearInterval(this.musicTimer); this.musicTimer = null; } if (this.rotateTimer) { clearInterval(this.rotateTimer); this.rotateTimer = null; } }
@@ -365,41 +358,17 @@
     }
     normalizeSprites();
 
-    function drawPixelSprite(sprite, cx, cy, desiredW, outline) {
-      const h = sprite.length, w = sprite[0].length;
-      const scale = desiredW / w;
-      const sx = Math.floor(-desiredW / 2), sy = Math.floor(-(h * scale) / 2);
-      for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
-        const col = sprite[r][c]; if (!col) continue;
-        ctx.fillStyle = col;
-        ctx.fillRect(cx + sx + c * scale, cy + sy + r * scale, Math.ceil(scale), Math.ceil(scale));
-        if (outline) { ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.strokeRect(cx + sx + c * scale, cy + sy + r * scale, Math.ceil(scale), Math.ceil(scale)); }
-      }
-    }
-
-    /* Icons (SVG) */
+    /* Icons (SVG), including passives */
     function skillIconSVG(key, size=26) {
       const s = size, c = '#fff';
-      if (key === "explosion_active") {
-        return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg">
-          <g fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round">
-            <path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/>
-            <circle cx="12" cy="12" r="2" fill="${c}"/>
-          </g>
-        </svg>`;
-      }
-      if (key === "shield_active") {
-        return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 3l7 3v5c0 5-4 8-7 10-3-2-7-5-7-10V6z" fill="${c}" opacity="0.9"/>
-          <path d="M12 3l7 3v5c0 5-4 8-7 10-3-2-7-5-7-10V6z" fill="none" stroke="#000" stroke-opacity=".25"/>
-        </svg>`;
-      }
-      if (key === "quickshot_active") {
-        return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg">
-          <path d="M6 18l6-12 1 7h5l-6 9 1-7z" fill="${c}"/>
-          <path d="M6 18l6-12 1 7h5l-6 9 1-7z" fill="none" stroke="#000" stroke-opacity=".25"/>
-        </svg>`;
-      }
+      if (key === "explosion_active") return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><circle cx="12" cy="12" r="2" fill="${c}"/></g></svg>`;
+      if (key === "shield_active")    return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l7 3v5c0 5-4 8-7 10-3-2-7-5-7-10V6z" fill="${c}" opacity="0.9"/><path d="M12 3l7 3v5c0 5-4 8-7 10-3-2-7-5-7-10V6z" fill="none" stroke="#000" stroke-opacity=".25"/></svg>`;
+      if (key === "quickshot_active") return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg"><path d="M6 18l6-12 1 7h5l-6 9 1-7z" fill="${c}"/><path d="M6 18l6-12 1 7h5l-6 9 1-7z" fill="none" stroke="#000" stroke-opacity=".25"/></svg>`;
+      if (key === "hp_plus_passive")  return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s-7-4.5-7-10a4.5 4.5 0 0 1 8-2 4.5 4.5 0 0 1 8 2c0 5.5-7 10-7 10z" fill="${c}" opacity=".95"/><path d="M12 7v6M9 10h6" stroke="#000" stroke-width="2" /></svg>`;
+      if (key === "regen_passive")    return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l-3 5a5 5 0 1 0 6 0z" fill="${c}"/></svg>`;
+      if (key === "xp_plus_passive")  return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l2.7 5.6L21 9l-4.5 4.1L17.4 19 12 16.2 6.6 19l.9-5.9L3 9l6.3-1.4z" fill="${c}"/></svg>`;
+      if (key === "damage_passive")   return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg"><path d="M3 21l9-9 2 2-9 9H3zM14 10l5-5 2 2-5 5-2-2z" fill="${c}"/></svg>`;
+      if (key === "multishot_passive")return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg"><path d="M4 12h8M6 8h10M6 16h10" stroke="${c}" stroke-width="2"/></svg>`;
       return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="${c}"/></svg>`;
     }
 
@@ -426,7 +395,6 @@
       hp: 50,
       maxHp: 50,
 
-      // Waves
       wave: 1,
       maxWaves: 100,
       waveTotal: 0,
@@ -436,7 +404,6 @@
       spawnTimer: 0,
       spawnCadence: 1.6,
 
-      // Skills
       skillSlots: [null, null, null],
       skillCooldowns: [0, 0, 0],
       skillLevels: {},
@@ -446,7 +413,7 @@
       paused: false,
       muted: false,
       joystickVec: { x: 0, y: 0 },
-      lastHitTime: 0,
+      pointerActive: false, pointerOrigin: {x:0,y:0},
       playLoopReq: null,
       shootTimer: 0,
       baseFireInterval: 0.3,
@@ -498,43 +465,25 @@
     function normalize(x, y) { const m = Math.hypot(x, y) || 1; return { x: x / m, y: y / m }; }
     function circleHit(ax, ay, ar, bx, by, br) { return (ax - bx) * (ax - bx) + (ay - by) * (ay - by) <= (ar + br) * (ar + br); }
 
-    /* Input */
-    const keys = {};
-    window.addEventListener("keydown", (e) => { keys[e.key.toLowerCase()] = true; });
-    window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+    /* Full-screen drag input */
+    function setupFullScreenInput() {
+      const start = (x, y) => { game.pointerActive = true; game.pointerOrigin = { x, y }; game.joystickVec.x = 0; game.joystickVec.y = 0; };
+      const move = (x, y) => {
+        if (!game.pointerActive) return;
+        const dx = x - game.pointerOrigin.x, dy = y - game.pointerOrigin.y;
+        const max = Math.min(game.viewW, game.viewH) * 0.18;
+        const mag = Math.hypot(dx, dy); const len = Math.min(max, mag) / (max || 1);
+        const nx = mag > 0 ? dx / mag : 0, ny = mag > 0 ? dy / mag : 0;
+        game.joystickVec.x = nx * len; game.joystickVec.y = ny * len;
+      };
+      const end = () => { game.pointerActive = false; game.joystickVec.x = 0; game.joystickVec.y = 0; };
 
-    const joystickEl = $("#joystick");
-    let joyState = { active: false, origin: { x: 0, y: 0 }, pos: { x: 0, y: 0 } };
-    function setupJoystick() {
-      const jcan = document.createElement("canvas");
-      const jctx = jcan.getContext("2d");
-      joystickEl.appendChild(jcan);
-      function sizeCanvas() { jcan.width = joystickEl.clientWidth * DPR; jcan.height = joystickEl.clientHeight * DPR; jcan.style.width = "100%"; jcan.style.height = "100%"; }
-      sizeCanvas(); new ResizeObserver(sizeCanvas).observe(joystickEl);
-      function drawJoy() {
-        const w = jcan.width, h = jcan.height, cx = w / 2, cy = h / 2;
-        jctx.clearRect(0, 0, w, h); jctx.save(); jctx.scale(DPR, DPR);
-        jctx.fillStyle = "rgba(0,0,0,0.35)"; jctx.beginPath();
-        jctx.arc(cx / DPR, cy / DPR, Math.min(jcan.clientWidth, jcan.clientHeight) / 2.2, 0, Math.PI * 2); jctx.fill();
-        jctx.fillStyle = "rgba(255,255,255,0.08)";
-        const px = cx / DPR + (joyState.pos.x - joyState.origin.x), py = cy / DPR + (joyState.pos.y - joyState.origin.y);
-        jctx.beginPath(); jctx.arc(px, py, Math.min(jcan.clientWidth, jcan.clientHeight) / 6, 0, Math.PI * 2); jctx.fill();
-        jctx.restore(); requestAnimationFrame(drawJoy);
-      }
-      drawJoy();
-      function toLocal(e, el) { const r = el.getBoundingClientRect(); if (e.touches) e = e.touches[0]; return { x: e.clientX - r.left, y: e.clientY - r.top }; }
-      function start(e) { e.preventDefault(); joyState.active = true; const p = toLocal(e, joystickEl); joyState.origin = { x: p.x, y: p.y }; joyState.pos = { x: p.x, y: p.y }; }
-      function move(e) {
-        if (!joyState.active) return; const p = toLocal(e, joystickEl); joyState.pos = { x: p.x, y: p.y };
-        const dx = joyState.pos.x - joyState.origin.x, dy = joyState.pos.y - joyState.origin.y;
-        const max = joystickEl.clientWidth * 0.35, mag = Math.hypot(dx, dy), nx = mag > 1 ? dx / Math.max(1, mag) : 0, ny = mag > 1 ? dy / Math.max(1, mag) : 0;
-        const len = Math.min(max, mag) / max; game.joystickVec.x = nx * len; game.joystickVec.y = ny * len;
-      }
-      function end() { joyState.active = false; game.joystickVec.x = 0; game.joystickVec.y = 0; }
-      joystickEl.addEventListener("touchstart", start, { passive: false });
-      joystickEl.addEventListener("touchmove", move, { passive: false });
-      joystickEl.addEventListener("touchend", end);
-      joystickEl.addEventListener("mousedown", (e) => { start(e); window.addEventListener("mousemove", move); window.addEventListener("mouseup", () => { end(); window.removeEventListener("mousemove", move); }); });
+      canvas.addEventListener("touchstart", (e) => { const t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: true });
+      canvas.addEventListener("touchmove",  (e) => { const t = e.touches[0]; move(t.clientX, t.clientY); }, { passive: true });
+      canvas.addEventListener("touchend", end);
+      canvas.addEventListener("mousedown", (e) => { start(e.clientX, e.clientY); });
+      window.addEventListener("mousemove", (e) => { move(e.clientX, e.clientY); });
+      window.addEventListener("mouseup", end);
     }
 
     /* Enemy stats */
@@ -547,7 +496,7 @@
       }
     }
 
-    /* Group spawning with stronger size-based HP buffs and elites */
+    /* Group spawning with strong size-based HP buffs and elites */
     function spawnEnemyGroup(count) {
       const types = ["enemy1", "enemy2", "enemy3"];
       const side = Math.floor(Math.random() * 4);
@@ -619,11 +568,11 @@
           Snd.osc("triangle", 800, 0.07, 0.08); FarcadeSafe.haptic();
         },
       },
-      // passives (track levels too)
-      hp_plus_passive: { name: "+Max HP", type: "passive", apply(key) { game.maxHp += 20; game.hp += 20; game.skillLevels[key] = (game.skillLevels[key] || 0) + 1; } },
-      regen_passive: { name: "Regen", type: "passive", apply(key) { player._regen = (player._regen || 0) + 1; game.skillLevels[key] = (game.skillLevels[key] || 0) + 1; } },
-      xp_plus_passive: { name: "XP Boost", type: "passive", apply(key) { player._xpBoost = (player._xpBoost || 0) + 0.25; game.skillLevels[key] = (game.skillLevels[key] || 0) + 1; } },
-      damage_passive: { name: "Damage+", type: "passive", apply(key) { player._dmg = (player._dmg || 0) + 0.25; game.skillLevels[key] = (game.skillLevels[key] || 0) + 1; } },
+      // passives track levels
+      hp_plus_passive:   { name: "+Max HP", type: "passive", apply(key) { game.maxHp += 20; game.hp += 20; game.skillLevels[key] = (game.skillLevels[key] || 0) + 1; } },
+      regen_passive:     { name: "Regen",  type: "passive", apply(key) { player._regen = (player._regen || 0) + 1; game.skillLevels[key] = (game.skillLevels[key] || 0) + 1; } },
+      xp_plus_passive:   { name: "XP Boost", type: "passive", apply(key) { player._xpBoost = (player._xpBoost || 0) + 0.25; game.skillLevels[key] = (game.skillLevels[key] || 0) + 1; } },
+      damage_passive:    { name: "Damage+",  type: "passive", apply(key) { player._dmg = (player._dmg || 0) + 0.25; game.skillLevels[key] = (game.skillLevels[key] || 0) + 1; } },
       multishot_passive: { name: "MultiShot", type: "passive", apply(key) { player._multishot = (player._multishot || 0) + 1; game.skillLevels[key] = (game.skillLevels[key] || 0) + 1; } },
     };
     const ACTIVE_KEYS = ["explosion_active", "shield_active", "quickshot_active"];
@@ -635,7 +584,7 @@
       const opts = [];
       const empty = hasEmptySkillSlot();
       for (const k of ACTIVE_KEYS) { const eq = equippedSlotOf(k) >= 0; if (eq && !isSkillMaxed(k)) opts.push(k); }
-      if (empty) for (const k of ACTIVE_KEYS) { if (equippedSlotOf(k) < 0 && !isSkillMaxed(k)) opts.push(k); }
+      if (empty) for (const k of ACTIVE_KEYS) if (equippedSlotOf(k) < 0 && !isSkillMaxed(k)) opts.push(k);
       for (const k of Object.keys(ALL_SKILLS)) if (ALL_SKILLS[k].type === "passive") opts.push(k);
       const unique = [...new Set(opts)], pick = [];
       while (pick.length < 3 && unique.length) pick.push(unique.splice(Math.floor(Math.random() * unique.length), 1)[0]);
@@ -730,7 +679,7 @@
       Snd.playShot(); FarcadeSafe.haptic();
     }
 
-    /* Waves (+10 per wave) */
+    /* Waves (+10 per, alive caps tuned) */
     function waveSize(w) { return 30 + 10 * (w - 1); }
     function waveAliveCap(w) { return Math.min(42, 14 + Math.floor(w * 1.2)); }
 
@@ -740,7 +689,6 @@
       game.spawnCadence = Math.max(0.9, 2.0 - w * 0.05);
       game.spawnTimer = 0.4;
       updateWaveBar();
-      // rotate music occasionally with waves too
       if (Snd.ctx && !Snd.muted && w % 3 === 1) Snd.nextTrack();
     }
     function nextWave() {
@@ -767,12 +715,11 @@
       if (text) text.textContent = `Wave ${game.wave}/${game.maxWaves}  Enemies ${game.waveKills}/${game.waveTotal}`;
     }
 
-    /* World build with fewer trees and avoidance around houses/roads */
+    /* World build */
     function buildWorld() {
       const W = game.worldW, H = game.worldH;
       game.world.trees = []; game.world.houses = []; game.world.flowers = []; game.world.roads = [];
 
-      // Roads extend beyond edges
       game.world.roads.push({
         pts: [
           { x: -120, y: H + 80 },
@@ -793,7 +740,6 @@
         width: 38
       });
 
-      // Houses
       const houseSpots = [
         { x: W * 0.27, y: H * 0.67, s: 1.15 },
         { x: W * 0.56, y: H * 0.36, s: 1.2 },
@@ -802,7 +748,6 @@
       ];
       game.world.houses.push(...houseSpots);
 
-      // Trees: fewer; avoid houses and roads
       const treeCount = 220;
       let tries = 0;
       while (game.world.trees.length < treeCount && tries < treeCount * 20) {
@@ -813,7 +758,6 @@
         game.world.trees.push({ x, y, s });
       }
 
-      // Flowers
       for (let i = 0; i < 700; i++) {
         const x = Math.random() * W, y = Math.random() * H;
         game.world.flowers.push({ x, y, c: Math.random() < 0.33 ? "#ffd166" : (Math.random() < 0.5 ? "#ff7ac9" : "#ffffff") });
@@ -858,7 +802,7 @@
 
       game.timeElapsed += dt;
 
-      // input/movement
+      // input/movement (keyboard OR full-screen drag)
       const kbX = (keys["arrowright"] || keys["d"] ? 1 : 0) - (keys["arrowleft"] || keys["a"] ? 1 : 0);
       const kbY = (keys["arrowdown"] || keys["s"] ? 1 : 0) - (keys["arrowup"] || keys["w"] ? 1 : 0);
       let ix = game.joystickVec.x || kbX, iy = game.joystickVec.y || kbY;
@@ -928,17 +872,16 @@
         if (b.ttl <= 0 || b.x < -100 || b.x > game.worldW + 100 || b.y < -100 || b.y > game.worldH + 100) game.bullets.splice(i, 1);
       }
 
-      // enemies
+      // enemies + direct collision damage per enemy (no shared cooldown)
       for (let i = game.enemies.length - 1; i >= 0; i--) {
         const e = game.enemies[i];
         const dx = player.x - e.x, dy = player.y - e.y, mag = Math.hypot(dx, dy) || 1;
         e.x += (dx / mag) * e.speed * dt; e.y += (dy / mag) * e.speed * dt;
 
-        const contactDmg = 1 + (game.wave - 1) * 0.2;
+        // per-second damage per enemy: 1 + (wave-1)*0.3
+        const contactDps = 1 + (game.wave - 1) * 0.3;
         if (circleHit(e.x, e.y, e.r, player.x, player.y, player.r + (player.invuln ? 4 : 0))) {
-          if (!player.invuln && now / 1000 - game.lastHitTime > 0.5) {
-            game.hp -= contactDmg; game.lastHitTime = now / 1000; FarcadeSafe.haptic();
-          }
+          if (!player.invuln) game.hp -= contactDps * dt; // stacks for multiple enemies
         }
 
         if (e.hp <= 0) {
@@ -991,7 +934,7 @@
       render();
     }
 
-    /* Drawing helpers */
+    /* Road draw */
     function drawRoad(pts, width, camX, camY) {
       ctx.save(); ctx.translate(-camX, -camY);
       ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
@@ -1078,7 +1021,7 @@
       }
       drawPlayerBow(psx, psy);
 
-      // damage text
+      // damage text with plate
       ctx.textAlign = "center"; ctx.font = "12px system-ui";
       for (const t of game.damageTexts) { const sx = t.x - camX, sy = t.y - camY; ctx.fillStyle = "rgba(0,0,0,0.45)"; ctx.fillRect(sx-12, sy-10, 24, 14); ctx.fillStyle = "rgba(255,240,220,0.98)"; ctx.fillText(t.val, sx, sy); }
 
@@ -1094,7 +1037,7 @@
       ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.strokeRect(pad, pad + 42, hpW, 10);
       ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.font = "11px system-ui, sans-serif"; ctx.fillText(`HP: ${Math.floor(Math.max(0, game.hp))}/${game.maxHp}`, pad + hpW + 8, pad + 51);
 
-      // Rapid Fire indicator plate near skills (won't overlap XP bar now)
+      // Rapid Fire indicator plate near skills
       if (player._hasteT > 0) {
         const secs = Math.ceil(player._hasteT);
         const plateW2 = 120, plateH2 = 22;
@@ -1116,12 +1059,10 @@
       }
     }
 
-    /* Landscape (no trees on roads/near houses) */
+    /* Landscape */
     function drawLandscape(camX, camY, vw, vh) {
-      // grass base
       ctx.fillStyle = "#7ccb53"; ctx.fillRect(0, 0, vw, vh);
 
-      // grass texture
       const tile = 16;
       for (let gx = Math.floor(camX / tile) * tile; gx < camX + vw + tile; gx += tile) {
         for (let gy = Math.floor(camY / tile) * tile; gy < camY + vh + tile; gy += tile) {
@@ -1131,16 +1072,10 @@
         }
       }
 
-      // roads
       for (const road of game.world.roads) drawRoad(road.pts, road.width, camX, camY);
-
-      // houses
       for (const h of game.world.houses) drawHouse(h.x - camX, h.y - camY, h.s);
-
-      // trees
       for (const t of game.world.trees) drawPixelTree(t.x - camX, t.y - camY, t.s);
 
-      // flowers
       for (let i = 0; i < game.world.flowers.length; i++) {
         const f = game.world.flowers[i];
         const sx = f.x - camX, sy = f.y - camY;
@@ -1218,6 +1153,11 @@
       requestAnimationFrame(uiLoop);
     })();
 
+    /* Input setup */
+    const keys = {};
+    window.addEventListener("keydown", (e) => { keys[e.key.toLowerCase()] = true; });
+    window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+
     function setupSkillButtons() {
       for (let i = 0; i < 3; i++) {
         const el = document.getElementById(`skill${i}`);
@@ -1235,7 +1175,7 @@
       const rect = canvas.getBoundingClientRect();
       canvas.style.width = rect.width + "px"; canvas.style.height = rect.height + "px";
       resizeCanvas();
-      setupJoystick(); setupSkillButtons(); updateSkillButtons();
+      setupFullScreenInput(); setupSkillButtons(); updateSkillButtons();
       for (let i = 0; i < 3; i++) $("#icon"+i).innerHTML = "";
       loadOptionalEnemyImages();
       setTimeout(() => FarcadeSafe.ready(), 250);
