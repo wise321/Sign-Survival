@@ -18,26 +18,52 @@
     canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; background:#7ccb53; cursor: crosshair; }
 
     .touch-layer { position: absolute; inset: 0; pointer-events: none; }
-    .joystick { display: none; }
     .skills { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; width: 140px; align-items: flex-end; pointer-events:auto; }
 
-    /* Overlay (level-up) */
+    /* Level-up overlay */
     .overlay { position: absolute; inset: 0; background: rgba(2, 6, 23, 0.6); display: flex; align-items: center; justify-content: center; pointer-events: auto; z-index: 8; }
     .choices { display: flex; gap: 12px; padding: 12px; background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
     .choice { width: 88px; height: 100px; min-width: 88px; min-height: 100px; background: #0f1724; border-radius: 10px; color: var(--hud); font-size: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border: 2px solid rgba(255,255,255,0.06); cursor: pointer; padding: 6px 4px; }
     .choice:active { transform: scale(0.98); }
 
     /* Skill buttons */
-    .skill-btn { width: 56px; height: 56px; border-radius: 14px; background: linear-gradient(180deg, #ffb255 0%, #ff7a1e 100%); box-shadow: 0 10px 16px rgba(0,0,0,.5), inset 0 0 0 2px rgba(0,0,0,.2); display: grid; place-items: center; color: white; font-weight: 800; font-size: 16px; border: 0; position: relative; overflow: hidden; isolation: isolate; }
-    .skill-btn::before { content: ""; position: absolute; inset: 0; border-radius: 14px; background: radial-gradient(90% 70% at 50% 0%, rgba(255,255,255,.35) 0%, rgba(255,255,255,.02) 70%); mix-blend-mode: screen; pointer-events: none; }
+    .skill-btn {
+      width: 56px; height: 56px; border-radius: 14px;
+      background: linear-gradient(180deg, #ffb255 0%, #ff7a1e 100%);
+      box-shadow: 0 10px 16px rgba(0,0,0,.5), inset 0 0 0 2px rgba(0,0,0,.2);
+      display: grid; place-items: center; color: white; font-weight: 800; font-size: 16px;
+      border: 0; position: relative; overflow: hidden; isolation: isolate;
+    }
+    .skill-btn::before {
+      content: ""; position: absolute; inset: 0; border-radius: 14px;
+      background: radial-gradient(90% 70% at 50% 0%, rgba(255,255,255,.35) 0%, rgba(255,255,255,.02) 70%);
+      mix-blend-mode: screen; pointer-events: none;
+    }
     .skill-btn .icon { position: relative; z-index: 3; width: 26px; height: 26px; filter: drop-shadow(0 1px 0 rgba(0,0,0,.5)); }
-    .skill-btn .cooler { position: absolute; inset: 0; border-radius: 14px; pointer-events: none; overflow: hidden; z-index: 1; box-shadow: inset 0 0 0 2px rgba(0,0,0,.28), inset 0 6px 18px rgba(0,0,0,.35); }
-    .skill-btn .cooler::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: calc((1 - var(--active, 0)) * 100%); background: repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 6px, rgba(255,255,255,0) 6px 12px), linear-gradient(180deg, rgba(48,237,255,.35), rgba(28,167,255,.22)); transition: height 100ms linear; mix-blend-mode: screen; }
-    .skill-btn .ring { position: absolute; inset: -4px; border-radius: 50%; z-index: 2; pointer-events: none; background: conic-gradient(rgba(255,255,255,.96) calc(var(--cool,0) * 360deg), rgba(255,255,255,.15) 0); -webkit-mask: radial-gradient(farthest-side, transparent calc(50% - 5px), #000 calc(50% - 5px)); mask: radial-gradient(farthest-side, transparent calc(50% - 5px), #000 calc(50% - 5px)); opacity: .9; transition: background 100ms linear, opacity 120ms ease; box-shadow: 0 0 8px rgba(0,0,0,.35); }
+    .skill-btn .cooler {
+      position: absolute; inset: 0; border-radius: 14px; pointer-events: none; overflow: hidden; z-index: 1;
+      box-shadow: inset 0 0 0 2px rgba(0,0,0,.28), inset 0 6px 18px rgba(0,0,0,.35);
+    }
+    .skill-btn .cooler::after {
+      content: ""; position: absolute; left: 0; right: 0; top: 0;
+      height: calc((1 - var(--active, 0)) * 100%);
+      background:
+        repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 6px, rgba(255,255,255,0) 6px 12px),
+        linear-gradient(180deg, rgba(48,237,255,.35), rgba(28,167,255,.22));
+      transition: height 100ms linear; mix-blend-mode: screen;
+    }
+    .skill-btn .ring {
+      position: absolute; inset: -4px; border-radius: 50%; z-index: 2; pointer-events: none;
+      background: conic-gradient(rgba(255,255,255,.96) calc(var(--cool,0) * 360deg), rgba(255,255,255,.15) 0);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(50% - 5px), #000 calc(50% - 5px));
+              mask: radial-gradient(farthest-side, transparent calc(50% - 5px), #000 calc(50% - 5px));
+      opacity: .9; transition: background 100ms linear, opacity 120ms ease;
+      box-shadow: 0 0 8px rgba(0,0,0,.35);
+    }
     .skill-btn.ready { box-shadow: 0 0 24px rgba(255,158,43,.55), 0 10px 16px rgba(0,0,0,.5); }
     .skill-btn[disabled] { opacity: .48; pointer-events: none; }
 
-    /* Wave bar (taller so text isn't cut) */
+    /* Wave bar (tall so text isn't cut) */
     .wavebar-wrap { position: absolute; top: 14px; left: 0; right: 0; pointer-events: none; z-index: 12; padding-left: 200px; padding-right: 16px; }
     .wavebar { margin: 0 auto; width: 76%; max-width: 360px; height: 34px; background: rgba(255,255,255,.12); border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,.15); position: relative; }
     .wavebar-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: linear-gradient(90deg, #35d0de, #1ca7ff); transition: width 120ms linear; z-index: 1; }
@@ -46,6 +72,33 @@
     .wavebar-labels .col.right { align-items: flex-end; }
     .wavebar-labels .t { font-weight: 700; }
     .wavebar-labels .b { opacity: .95; }
+
+    /* Transparent joystick (visual only; input handled on canvas) */
+    .joystick {
+      position: absolute;
+      width: 110px; height: 110px;
+      left: 80px; bottom: 80px;
+      transform: translate(-50%, -50%);
+      opacity: 0; transition: opacity 120ms ease;
+      pointer-events: none; z-index: 6;
+    }
+    .joystick .j-base {
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.35);
+      background: transparent;
+      box-shadow: 0 0 0 2px rgba(0,0,0,0.15) inset;
+    }
+    .joystick .j-knob {
+      position: absolute; width: 44px; height: 44px; left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.75);
+      background: radial-gradient(50% 50% at 40% 35%, rgba(255,255,255,0.45), rgba(255,255,255,0.05));
+      box-shadow:
+        0 0 18px rgba(255,255,255,0.25),
+        inset 0 0 0 2px rgba(0,0,0,0.25);
+    }
 
     /* Start overlay */
     .start-overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(8, 10, 18, .8); z-index: 10; }
@@ -91,7 +144,12 @@
       </div>
 
       <div class="touch-layer" id="touchLayer">
-        <div class="joystick" id="joystick"></div>
+        <!-- Transparent, movable joystick (visual only) -->
+        <div class="joystick" id="joystick">
+          <div class="j-base"></div>
+          <div class="j-knob" id="jKnob"></div>
+        </div>
+
         <div class="skills" id="skills">
           <button class="skill-btn" id="skill0" aria-label="skill1">
             <div class="cooler"></div><div class="ring"></div><span class="icon" id="icon0"></span>
@@ -106,7 +164,6 @@
       </div>
 
       <!-- Bottom level indicator intentionally removed -->
-      <!-- <div class="xpbar-wrap"><div class="xpbar" id="xpbar"></div></div> -->
 
       <!-- Start overlay -->
       <div class="start-overlay" id="startOverlay">
@@ -133,7 +190,7 @@
       };
     })();
 
-    /* WebAudio */
+    /* WebAudio (minimal SFX helpers retained) */
     const Snd = {
       ctx: null, gain: null, musicGain: null, muted: false,
       musicTimer: null, rotateTimer: null, trackIdx: 0,
@@ -173,37 +230,7 @@
       playShot() { this.osc("triangle", 520, 0.07, 0.07, 'gain', 0.005, 0.06); this.noise(0.05, 0.07, 900); },
       playExplode() { this.noise(0.2, 0.26, 160); this.osc("sine", 160, 0.14, 0.08, 'gain', 0.005, 0.12); },
       playPickup() { this.osc("triangle", 1000, 0.12, 0.08, 'gain', 0.01, 0.08); },
-      setTrack(i=0) {
-        if (!this.ctx) return;
-        if (this.musicTimer) { clearInterval(this.musicTimer); this.musicTimer = null; }
-        this.trackIdx = ((i % 3) + 3) % 3;
-        let step = 0;
-        const stepMs = [330, 300, 360][this.trackIdx];
-        const play = () => {
-          if (this.muted) return;
-          if (this.trackIdx === 0) {
-            const arp = [262, 330, 392, 523, 330, 392, 494, 659];
-            const f = arp[step % arp.length];
-            this.osc("square", f, 0.16, 0.05, 'musicGain', 0.01, 0.12);
-            if (step % 2 === 0) this.osc("triangle", f*2, 0.12, 0.04, 'musicGain', 0.008, 0.1);
-          } else if (this.trackIdx === 1) {
-            const bass = [196, 220, 247, 196][Math.floor(step/4) % 4];
-            if (step % 2 === 0) this.osc("sine", bass, 0.22, 0.06, 'musicGain', 0.01, 0.18);
-            const lead = [523, 587, 659, 587, 523, 494, 523, 587][step % 8];
-            this.osc("triangle", lead, 0.14, 0.045, 'musicGain', 0.008, 0.12);
-          } else {
-            const chord = [[233, 294, 349], [196, 247, 294], [262, 330, 392], [220, 277, 330]][Math.floor(step/4) % 4];
-            const note = chord[step % 3];
-            this.osc("sine", note, 0.18, 0.055, 'musicGain', 0.01, 0.14);
-            if (step % 4 === 0) this.noise(0.03, 0.05, 1500);
-          }
-          step++;
-        };
-        this.musicTimer = setInterval(play, stepMs);
-      },
-      nextTrack() { this.setTrack(this.trackIdx + 1); },
-      startMusic() { if (!this.ctx || this.muted) return; if (!this.musicTimer) this.setTrack(0); if (this.rotateTimer) clearInterval(this.rotateTimer); this.rotateTimer = setInterval(() => this.nextTrack(), 45000); },
-      stopMusic() { if (this.musicTimer) { clearInterval(this.musicTimer); this.musicTimer = null; } if (this.rotateTimer) { clearInterval(this.rotateTimer); this.rotateTimer = null; } }
+      setTrack() {}, nextTrack(){}, startMusic(){}, stopMusic() {}
     };
 
     const $ = (s, root = document) => root.querySelector(s);
@@ -224,10 +251,12 @@
       game.onResize(rect.width, rect.height);
     }
 
-    /* Optional custom images with black chroma key */
+    /* Custom images with black chroma-key removal */
     const CUSTOM_SPRITE_CANVAS = {};    // enemies
     let CUSTOM_MAIN_SPRITE = null;      // player
     const CUSTOM_TREE_CANVAS = {};      // trees: tree1..tree4
+    let CUSTOM_HOUSE_IMAGE = null;      // house1.jpg
+    const CUSTOM_DECO_CANVAS = {};      // deco1..4
 
     function loadChromaImage(src, key=[0,0,0], tol=40) {
       return new Promise((resolve) => {
@@ -243,7 +272,7 @@
             for (let i = 0; i < data.data.length; i += 4) {
               const r = data.data[i], g = data.data[i+1], b = data.data[i+2];
               const dr=r-key[0], dg=g-key[1], db=b-key[2];
-              if (dr*dr + dg*dg + db*db <= t2 || (r < 8 && g < 8 && b < 8)) data.data[i+3] = 0;
+              if (dr*dr + dg*dg + db*db <= t2 || (r < 10 && g < 10 && b < 10)) data.data[i+3] = 0;
             }
             ox.putImageData(data, 0, 0);
           } catch (e) {}
@@ -269,8 +298,18 @@
         if (c) CUSTOM_TREE_CANVAS[`tree${i}`] = c;
       }
     }
+    async function loadOptionalHouseImage() {
+      const c = await loadChromaImage("house1.jpg");
+      if (c) CUSTOM_HOUSE_IMAGE = c;
+    }
+    async function loadOptionalDecos() {
+      for (let i=1;i<=4;i++) {
+        const c = await loadChromaImage(`deco${i}.jpg`);
+        if (c) CUSTOM_DECO_CANVAS[`deco${i}`] = c;
+      }
+    }
 
-    /* Pixel fallback sprites (enemies) */
+    /* Pixel fallback sprites (enemies only) */
     const SPRITES = {
       enemy1: [
         [null, null, "#16321a", "#16321a", null],
@@ -327,7 +366,7 @@
       explosions: [],
       fxParticles: [],
       damageTexts: [],
-      world: { trees: [], flowers: [], houses: [], roads: [] },
+      world: { trees: [], flowers: [], houses: [], roads: [], decos: [] },
 
       score: 0,
       level: 1,
@@ -361,7 +400,7 @@
       baseFireInterval: 0.3,
       timeElapsed: 0,
       cameraX: 0, cameraY: 0,
-      lastAimAngle: Math.PI / 6, // start at ~4 o'clock
+      lastAimAngle: Math.PI / 6, // 4 o'clock
 
       onResize(w, h) {
         this.viewW = w; this.viewH = h;
@@ -408,23 +447,74 @@
     function normalize(x, y) { const m = Math.hypot(x, y) || 1; return { x: x / m, y: y / m }; }
     function circleHit(ax, ay, ar, bx, by, br) { return (ax - bx) * (ax - bx) + (ay - by) * (ay - by) <= (ar + br) * (ar + br); }
 
-    /* Full-screen drag input */
+    /* Transparent joystick visuals + input */
+    const joyEl = $("#joystick");
+    const knobEl = $("#jKnob");
+    const JOY_SIZE = 110;
+    const JOY_RADIUS = 44; // movement radius inside
+    const JOY_AREA_LEFT_RATIO = 0.5;   // left half of screen
+    const JOY_AREA_BOTTOM_RATIO = 0.55; // bottom 45% of screen allowed
+    let joyCenter = { x: 90, y: 90 };
+    function setJoyVisible(v) { joyEl.style.opacity = v ? "0.85" : "0"; }
+    function positionJoy(cx, cy) {
+      joyEl.style.left = cx + "px";
+      joyEl.style.top = cy + "px";
+    }
+    function setKnob(dx, dy) {
+      knobEl.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    }
+
     function setupFullScreenInput() {
-      const start = (x, y) => { game.pointerActive = true; game.pointerOrigin = { x, y }; game.joystickVec.x = 0; game.joystickVec.y = 0; };
+      const start = (x, y, isTouch=false) => {
+        game.pointerActive = true;
+        // Show joystick only if within left/bottom allowed region
+        const allowLeft = x <= game.viewW * JOY_AREA_LEFT_RATIO;
+        const allowBottom = y >= game.viewH * JOY_AREA_BOTTOM_RATIO;
+        if (isTouch && allowLeft && allowBottom) {
+          // Clamp center so visual stays inside screen
+          const cx = clamp(x, 60, Math.min(game.viewW * 0.5, game.viewW - 60));
+          const cy = clamp(y, game.viewH * 0.55, game.viewH - 60);
+          joyCenter = { x: cx, y: cy };
+          positionJoy(cx, cy);
+          setKnob(0,0);
+          setJoyVisible(true);
+          game.pointerOrigin = { x: cx, y: cy };
+        } else {
+          setJoyVisible(false);
+          game.pointerOrigin = { x, y };
+        }
+        game.joystickVec.x = 0; game.joystickVec.y = 0;
+      };
       const move = (x, y) => {
         if (!game.pointerActive) return;
         const dx = x - game.pointerOrigin.x, dy = y - game.pointerOrigin.y;
-        const max = Math.min(game.viewW, game.viewH) * 0.18;
-        const mag = Math.hypot(dx, dy); const len = Math.min(max, mag) / (max || 1);
+        // scale to joystick radius
+        const mag = Math.hypot(dx, dy);
+        const lim = JOY_RADIUS;
+        const scale = mag > 0 ? Math.min(1, mag / lim) : 0;
         const nx = mag > 0 ? dx / mag : 0, ny = mag > 0 ? dy / mag : 0;
-        game.joystickVec.x = nx * len; game.joystickVec.y = ny * len;
+        game.joystickVec.x = nx * scale; game.joystickVec.y = ny * scale;
+        if (joyEl.style.opacity !== "0") setKnob(nx * lim, ny * lim);
       };
-      const end = () => { game.pointerActive = false; game.joystickVec.x = 0; game.joystickVec.y = 0; };
+      const end = () => {
+        game.pointerActive = false; game.joystickVec.x = 0; game.joystickVec.y = 0;
+        setJoyVisible(false);
+        setKnob(0,0);
+      };
 
-      canvas.addEventListener("touchstart", (e) => { const t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: true });
-      canvas.addEventListener("touchmove",  (e) => { const t = e.touches[0]; move(t.clientX, t.clientY); }, { passive: true });
+      // Touch
+      canvas.addEventListener("touchstart", (e) => {
+        const t = e.touches[0];
+        start(t.clientX, t.clientY, true);
+      }, { passive: true });
+      canvas.addEventListener("touchmove",  (e) => {
+        const t = e.touches[0];
+        move(t.clientX, t.clientY);
+      }, { passive: true });
       canvas.addEventListener("touchend", end);
-      canvas.addEventListener("mousedown", (e) => { start(e.clientX, e.clientY); });
+
+      // Mouse (no joystick visual)
+      canvas.addEventListener("mousedown", (e) => { start(e.clientX, e.clientY, false); });
       window.addEventListener("mousemove", (e) => { move(e.clientX, e.clientY); });
       window.addEventListener("mouseup", end);
     }
@@ -477,7 +567,7 @@
       }
     }
 
-    /* Skills */
+    /* Skills (unchanged core) */
     const ALL_SKILLS = {
       explosion_active: { name: "Explosion", type: "active", cooldown: 8, maxLevel: 15, duration() { return 0.3; }, activate(level) { const base = 100 + 20 * Math.max(0, level - 1); const mult = 1 + (player._dmg || 0); const dmg = base * mult; radialDamage(player.x, player.y, 92, dmg); createExplosion(player.x, player.y, 92, 0.22); spawnExplosionFX(player.x, player.y); Snd.playExplode(); FarcadeSafe.haptic(); }, },
       shield_active:    { name: "Shield",    type: "active", cooldown: 12, maxLevel: 15, duration(level) { return 5 + 0.5 * Math.max(0, level - 1); }, activate(level) { const dur = 5 + 0.5 * Math.max(0, level - 1); player.invuln = Math.max(player.invuln || 0, dur); Snd.osc("sine", 520, 0.1, 0.08); FarcadeSafe.haptic(); }, },
@@ -541,18 +631,18 @@
       for (let i = 0; i < 3; i++) {
         const btn = document.getElementById(`skill${i}`);
         const cool = btn.querySelector(".cooler");
-        theRing = btn.querySelector(".ring");
+        const ring = btn.querySelector(".ring");
         const icon = document.getElementById(`icon${i}`);
         const key = game.skillSlots[i];
 
         if (!key) {
           icon.innerHTML = ""; btn.style.opacity = 0.6; btn.setAttribute("disabled","true");
-          cool.style.setProperty("--active","0"); theRing.style.setProperty("--cool","0"); btn.classList.remove("ready");
+          cool.style.setProperty("--active","0"); ring.style.setProperty("--cool","0"); btn.classList.remove("ready");
         } else {
           icon.innerHTML = skillIconSVG(key, 26); btn.style.opacity = 1; btn.removeAttribute("disabled");
           const cd = game.skillCooldowns[i] || 0; const totalCd = ALL_SKILLS[key].cooldown || 4;
           const coolPct = 1 - Math.max(0, Math.min(1, cd / totalCd));
-          theRing.style.setProperty("--cool", String(coolPct));
+          ring.style.setProperty("--cool", String(coolPct));
           const at = game.skillActiveTimers[i] || 0, atTot = game.skillActiveTotals[i] || 1;
           const activePct = Math.max(0, Math.min(1, at / atTot));
           cool.style.setProperty("--active", String(activePct));
@@ -607,7 +697,6 @@
       game.spawnCadence = Math.max(0.9, 2.0 - w * 0.05);
       game.spawnTimer = 0.4;
       updateWaveBar();
-      if (Snd.ctx && !Snd.muted && w % 3 === 1) Snd.nextTrack();
     }
     function nextWave() {
       if (game.wave >= game.maxWaves) {
@@ -635,10 +724,10 @@
       if (ev) ev.textContent = `${game.waveKills}/${game.waveTotal}`;
     }
 
-    /* World build */
+    /* World build (trees spaced out, decos, imported house) */
     function buildWorld() {
       const W = game.worldW, H = game.worldH;
-      game.world.trees = []; game.world.houses = []; game.world.flowers = []; game.world.roads = [];
+      game.world.trees = []; game.world.houses = []; game.world.flowers = []; game.world.roads = []; game.world.decos = [];
 
       // roads and houses
       game.world.roads.push({ pts: [ { x: -120, y: H + 80 }, { x: W * 0.22, y: H * 0.72 }, { x: W * 0.45, y: H * 0.52 }, { x: W * 0.66, y: H * 0.34 }, { x: W + 120, y: -80 } ], width: 46 });
@@ -652,9 +741,9 @@
       ];
       game.world.houses.push(...houseSpots);
 
-      // Trees: ensure spacing; 4 types distributed randomly
+      // Trees: ensure spacing; exactly 4 types; no ground shadows (design)
       const treeCount = 220;
-      const minDist = 60; // pixels between trees (world space) — farther apart
+      const minDist = 60;
       let tries = 0;
       function farFromTrees(x, y) {
         for (const t of game.world.trees) {
@@ -668,12 +757,36 @@
         const x = Math.random() * W, y = Math.random() * H, s = 0.9 + Math.random() * 0.8;
         if (!farFromTrees(x, y)) continue;
         if (nearAnyHouse(x, y, 110)) continue;
-        if (nearAnyRoad(x, y, 24)) continue;
-        const type = Math.floor(Math.random() * 4); // 4 distinct types
+        if (nearAnyRoad(x, y, 28)) continue;
+        const type = Math.floor(Math.random() * 4); // four types
         game.world.trees.push({ x, y, s, type });
       }
 
-      // flowers (small specks)
+      // Decorations (deco1..4) — avoid roads/houses and stay away from trees
+      const decoKeys = Object.keys(CUSTOM_DECO_CANVAS);
+      const decoCount = 120;
+      const decoTreePad = 42;
+      const decoDecoPad = 36;
+      let dtries = 0;
+      function farFromDecos(x,y) {
+        for (const d of game.world.decos) { const dx=x-d.x, dy=y-d.y; if (dx*dx+dy*dy < decoDecoPad*decoDecoPad) return false; }
+        return true;
+      }
+      while (game.world.decos.length < decoCount && dtries < decoCount * 60) {
+        dtries++;
+        const x = Math.random() * W, y = Math.random() * H, s = 0.6 + Math.random()*0.8;
+        if (nearAnyHouse(x,y,120)) continue;
+        if (nearAnyRoad(x,y,30)) continue;
+        // not too close to trees
+        let closeTree = false;
+        for (const t of game.world.trees) { const dx=x-t.x, dy=y-t.y; if (dx*dx+dy*dy < decoTreePad*decoTreePad) { closeTree = true; break; } }
+        if (closeTree) continue;
+        if (!farFromDecos(x,y)) continue;
+        const key = decoKeys.length ? decoKeys[Math.floor(Math.random()*decoKeys.length)] : null;
+        game.world.decos.push({ x, y, s, key });
+      }
+
+      // flowers
       for (let i = 0; i < 700; i++) {
         const x = Math.random() * W, y = Math.random() * H;
         game.world.flowers.push({ x, y, c: Math.random() < 0.33 ? "#ffd166" : (Math.random() < 0.5 ? "#ff7ac9" : "#ffffff") });
@@ -711,7 +824,7 @@
 
       game.timeElapsed += dt;
 
-      // input/movement
+      // input/movement (keyboard OR joystick drag)
       const kbX = (keys["arrowright"] || keys["d"] ? 1 : 0) - (keys["arrowleft"] || keys["a"] ? 1 : 0);
       const kbY = (keys["arrowdown"] || keys["s"] ? 1 : 0) - (keys["arrowup"] || keys["w"] ? 1 : 0);
       let ix = game.joystickVec.x || kbX, iy = game.joystickVec.y || kbY;
@@ -799,7 +912,7 @@
         }
       }
 
-      // fx particles
+      // explosions / FX particles
       for (let i = game.explosions.length - 1; i >= 0; i--) { const ex = game.explosions[i]; ex.ttl -= dt; if (ex.ttl <= 0) game.explosions.splice(i, 1); }
       for (let i = game.fxParticles.length - 1; i >= 0; i--) {
         const p = game.fxParticles[i]; p.ttl -= dt;
@@ -809,7 +922,7 @@
         if (p.ttl <= 0 || p.alpha <= 0) game.fxParticles.splice(i, 1);
       }
 
-      // pickups: tiny "Sign" orange-metallic text (replaces orb)
+      // pickups lifetime/magnet handled later in render; here only movement
       for (let i = game.pickups.length - 1; i >= 0; i--) {
         const p = game.pickups[i]; p.ttl -= dt;
         const dx = player.x - p.x, dy = player.y - p.y, d = Math.hypot(dx, dy), magnetRange = 120;
@@ -856,6 +969,22 @@
       ctx.restore();
     }
 
+    /* Simple pixel sprite draw helper */
+    function drawPixelSprite(sprite, cx, cy, size=24, center=true) {
+      const rows = sprite.length, cols = sprite[0].length;
+      const scale = size / Math.max(rows, cols);
+      const ox = center ? -cols * scale / 2 : 0;
+      const oy = center ? -rows * scale / 2 : 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const col = sprite[y][x];
+          if (!col) continue;
+          ctx.fillStyle = col;
+          ctx.fillRect(Math.floor(cx + ox + x * scale), Math.floor(cy + oy + y * scale), Math.ceil(scale), Math.ceil(scale));
+        }
+      }
+    }
+
     /* Rendering */
     function render() {
       const vw = game.viewW, vh = game.viewH;
@@ -884,16 +1013,28 @@
         ctx.restore();
       }
 
-      // pickups: tiny "Sign" word (orange metallic)
+      // pickups: tiny glowing "Sign" (strong contrast + subtle pulsing)
       for (const p of game.pickups) {
         const sx = p.x - camX, sy = p.y - camY;
-        const lg = ctx.createLinearGradient(sx-10, sy, sx+10, sy);
-        lg.addColorStop(0, "#ffb24f"); lg.addColorStop(0.5, "#ff7a1e"); lg.addColorStop(1, "#ffb24f");
+        const pulse = 0.6 + 0.4 * Math.sin(game.timeElapsed * 6 + (p.seed || 0));
         ctx.save();
-        ctx.font = "bold 9px system-ui, sans-serif";
+        ctx.font = "bold 11px system-ui, sans-serif";
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 3; ctx.strokeText("Sign", Math.round(sx)+0.5, Math.round(sy)+0.5);
-        ctx.fillStyle = lg; ctx.fillText("Sign", Math.round(sx)+0.5, Math.round(sy)+0.5);
+        // strong dark outline
+        ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,0.75)"; ctx.strokeText("Sign", Math.round(sx)+0.5, Math.round(sy)+0.5);
+        // inner bright outline
+        ctx.lineWidth = 2; ctx.strokeStyle = "rgba(255,180,60,0.9)"; ctx.strokeText("Sign", Math.round(sx)+0.5, Math.round(sy)+0.5);
+        // metallic gradient fill
+        const lg = ctx.createLinearGradient(sx-12, sy-6, sx+12, sy+6);
+        lg.addColorStop(0, "#fff0bf");
+        lg.addColorStop(0.35, "#ffb24f");
+        lg.addColorStop(0.6, "#ff6a00");
+        lg.addColorStop(1, "#fff0bf");
+        ctx.fillStyle = lg;
+        // glow
+        ctx.shadowColor = `rgba(255,180,60,${0.55 + 0.35*pulse})`;
+        ctx.shadowBlur = 10 + 10 * pulse;
+        ctx.fillText("Sign", Math.round(sx)+0.5, Math.round(sy)+0.5);
         ctx.restore();
       }
 
@@ -931,7 +1072,7 @@
       ctx.textAlign = "center"; ctx.font = "12px system-ui";
       for (const t of game.damageTexts) { const sx = t.x - camX, sy = t.y - camY; ctx.fillStyle = "rgba(0,0,0,0.45)"; ctx.fillRect(sx-12, sy-10, 24, 14); ctx.fillStyle = "rgba(255,240,220,0.98)"; ctx.fillText(t.val, sx, sy); }
 
-      // Left HUD (compact)
+      // Left HUD
       const pad = SAFE_MARGIN;
       const plateW = 200, plateH = 92;
       const barW = 140, barH = 10;
@@ -940,15 +1081,12 @@
       ctx.fillStyle = "rgba(255,255,255,0.98)"; ctx.font = "14px system-ui, sans-serif"; ctx.textAlign = "left";
       ctx.fillText(`Score: ${Math.floor(game.score)}`, pad, pad + 14);
 
-      // HP label above bar
       ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "12px system-ui, sans-serif";
       ctx.fillText(`HP: ${Math.floor(Math.max(0, game.hp))}/${game.maxHp}`, pad, pad + 32);
-      // HP bar
       ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fillRect(pad, pad + 38, barW, barH);
       ctx.fillStyle = "#ff6b6b"; ctx.fillRect(pad, pad + 38, barW * (Math.max(0, game.hp) / game.maxHp), barH);
       ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.strokeRect(pad, pad + 38, barW, barH);
 
-      // Level label and bar
       ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "12px system-ui, sans-serif";
       ctx.fillText(`Level ${game.level}`, pad, pad + 60);
       const lvPct = Math.min(1, game.xp / Math.max(1, game.xpToNext));
@@ -956,17 +1094,6 @@
       const grad = ctx.createLinearGradient(pad, 0, pad + barW, 0); grad.addColorStop(0, "#ff8c2f"); grad.addColorStop(1, "#ff6b00");
       ctx.fillStyle = grad; ctx.fillRect(pad, pad + 66, barW * lvPct, barH);
       ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.strokeRect(pad, pad + 66, barW, barH);
-
-      // Rapid Fire indicator
-      if (player._hasteT > 0) {
-        const secs = Math.ceil(player._hasteT);
-        const plateW2 = 120, plateH2 = 22;
-        const x = game.viewW - 12 - 140;
-        const y = game.viewH - 12 - (56*3 + 16) - 8 - plateH2;
-        ctx.fillStyle = "rgba(0,0,0,0.55)"; roundRect(x, y, plateW2, plateH2, 10, true, false);
-        ctx.fillStyle = "rgba(255,255,255,0.95)"; ctx.font = "12px system-ui";
-        ctx.textAlign = "center"; ctx.fillText(`Rapid Fire ${secs}s`, x + plateW2/2, y + 15);
-      }
 
       function roundRect(x, y, w, h, r, fill, stroke) {
         ctx.beginPath();
@@ -979,7 +1106,7 @@
       }
     }
 
-    /* Landscape + trees */
+    /* Landscape + trees + houses + decos */
     function drawLandscape(camX, camY, vw, vh) {
       ctx.fillStyle = "#7ccb53"; ctx.fillRect(0, 0, vw, vh);
 
@@ -996,6 +1123,7 @@
       for (const road of game.world.roads) drawRoad(road.pts, road.width, camX, camY);
       for (const h of game.world.houses) drawHouse(h.x - camX, h.y - camY, h.s);
       for (const t of game.world.trees) drawFancyTree(t.x - camX, t.y - camY, t.s, t.type);
+      for (const d of game.world.decos) drawDeco(d.x - camX, d.y - camY, d.s, d.key);
 
       // tiny flowers
       for (let i = 0; i < game.world.flowers.length; i++) {
@@ -1008,7 +1136,13 @@
 
     function drawHouse(x, y, s=1) {
       ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(s, s);
-      ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(-20, 18, 44, 6);
+      if (CUSTOM_HOUSE_IMAGE) {
+        const img = CUSTOM_HOUSE_IMAGE;
+        const w = 50, h = 36; // base footprint
+        ctx.drawImage(img, Math.floor(-w/2), Math.floor(-h+20), Math.floor(w), Math.floor(h));
+        ctx.restore(); return;
+      }
+      // fallback simple house
       ctx.fillStyle = "#f2e4b3"; ctx.fillRect(-18, 0, 36, 22);
       ctx.fillStyle = "#5e3a1f"; ctx.fillRect(-4, 8, 8, 14);
       ctx.fillStyle = "#cc3024"; ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(0, -14); ctx.lineTo(22, 0); ctx.closePath(); ctx.fill();
@@ -1017,25 +1151,20 @@
       ctx.restore();
     }
 
-    // Detailed trees; no ground shadow; supports custom tree1..tree4.jpg
+    // Trees — no ground shadow; supports tree1..tree4.jpg
     function drawFancyTree(x, y, s=1, type=0) {
       ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(s, s);
-
-      // If custom image exists for this type, draw it (remove black already via chroma)
       const key = `tree${(type % 4) + 1}`;
       const img = CUSTOM_TREE_CANVAS[key];
       if (img) {
-        // Draw so that the bottom sits near y=8 (trunk base), centered horizontally
-        const desiredH = 48; // base height in local units before scaling
+        const desiredH = 48;
         const aspect = img.width / img.height || 1;
         const h = desiredH;
         const w = desiredH * aspect;
         ctx.drawImage(img, Math.floor(-w/2), Math.floor(-h + 8), Math.floor(w), Math.floor(h));
-        ctx.restore();
-        return;
+        ctx.restore(); return;
       }
-
-      // Fallback vector trees (no ground shadow)
+      // fallback vector styles (no shadow)
       switch (type % 4) {
         case 0: drawBroadleaf(); break;
         case 1: drawTallBroadleaf(); break;
@@ -1085,6 +1214,20 @@
         ctx.moveTo(0, -2); ctx.lineTo(-10, -16); ctx.moveTo(-2,-6); ctx.lineTo(10,-20); ctx.moveTo(2,-10); ctx.lineTo(14,-28);
         ctx.stroke();
       }
+    }
+
+    function drawDeco(x, y, s=1, key=null) {
+      ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(s, s);
+      if (key && CUSTOM_DECO_CANVAS[key]) {
+        const img = CUSTOM_DECO_CANVAS[key];
+        const w = 22, h = 22;
+        ctx.drawImage(img, Math.floor(-w/2), Math.floor(-h/2), Math.floor(w), Math.floor(h));
+        ctx.restore(); return;
+      }
+      // fallback small stump/rock
+      ctx.fillStyle = "#6b502d"; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "#8a6a3b"; ctx.fillRect(-4, -6, 8, 6);
+      ctx.restore();
     }
 
     /* Player visuals */
@@ -1137,23 +1280,7 @@
       ctx.restore();
     }
 
-    /* Simple pixel sprite draw helper */
-    function drawPixelSprite(sprite, cx, cy, size=24, center=true) {
-      const rows = sprite.length, cols = sprite[0].length;
-      const scale = size / Math.max(rows, cols);
-      const ox = center ? -cols * scale / 2 : 0;
-      const oy = center ? -rows * scale / 2 : 0;
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          const col = sprite[y][x];
-          if (!col) continue;
-          ctx.fillStyle = col;
-          ctx.fillRect(Math.floor(cx + ox + x * scale), Math.floor(cy + oy + y * scale), Math.ceil(scale), Math.ceil(scale));
-        }
-      }
-    }
-
-    /* UI loop (bottom level indicator removed) */
+    /* UI loop */
     (function uiLoop() {
       updateWaveBar();
       updateSkillButtons();
@@ -1187,13 +1314,15 @@
       loadOptionalEnemyImages();
       loadOptionalMainSprite();
       loadOptionalTreeImages();
+      loadOptionalHouseImage();
+      loadOptionalDecos();
       setTimeout(() => FarcadeSafe.ready(), 250);
     }
     function startGame() {
       game.reset();
       game.running = true; game.paused = false;
       if (!Snd.ctx) { Snd.init(); }
-      Snd.startMusic();
+      Snd.startMusic && Snd.startMusic();
       if (!game.playLoopReq) game.playLoopReq = requestAnimationFrame(loop);
     }
     function boot() {
