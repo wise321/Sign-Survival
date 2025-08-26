@@ -20,7 +20,7 @@
     .touch-layer { position: absolute; inset: 0; pointer-events: none; }
     .skills { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; width: 140px; align-items: flex-end; pointer-events:auto; }
 
-    /* Overlays */
+    /* Level-up & game-over overlays */
     .overlay { position: absolute; inset: 0; background: rgba(2, 6, 23, 0.6); display: flex; align-items: center; justify-content: center; pointer-events: auto; z-index: 8; }
     .choices { display: flex; gap: 12px; padding: 12px; background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
     .choice { width: 88px; height: 100px; min-width: 88px; min-height: 100px; background: #0f1724; border-radius: 10px; color: var(--hud); font-size: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border: 2px solid rgba(255,255,255,0.06); cursor: pointer; padding: 6px 4px; }
@@ -33,8 +33,7 @@
       box-shadow: 0 10px 16px rgba(0,0,0,.5), inset 0 0 0 2px rgba(0,0,0,.2);
       display: grid; place-items: center; color: white; font-weight: 800; font-size: 16px;
       border: 0; position: relative; overflow: hidden; isolation: isolate;
-      /* Colored when ready; dim while cooling via CSS vars */
-      filter: saturate(var(--sat,1)) brightness(var(--bright,1));
+      filter: saturate(var(--sat,1)) brightness(var(--bright,1)); /* colored when ready; dim while cooling */
     }
     .skill-btn::before {
       content: ""; position: absolute; inset: 0; border-radius: 14px;
@@ -46,14 +45,14 @@
       position: absolute; inset: 0; border-radius: 14px; pointer-events: none; overflow: hidden; z-index: 1;
       box-shadow: inset 0 0 0 2px rgba(0,0,0,.28), inset 0 6px 18px rgba(0,0,0,.35);
     }
-    /* Active tinted fill behind the icon (visible only while active) */
+    /* Active tinted fill that doesn't cover the icon (behind icon, in front of cooler) */
     .skill-btn .activebg {
-      position: absolute; inset: 0; border-radius: 14px; z-index: 2; pointer-events: none;
+      position: absolute; inset: 0; border-radius: 14px; z-index: 1; pointer-events: none;
       background: linear-gradient(180deg, rgba(48,237,255,.55), rgba(28,167,255,.35));
       mix-blend-mode: screen;
       opacity: 0; transition: opacity 120ms linear;
     }
-    .skill-btn.active .activebg { opacity: .9; }
+    .skill-btn.active .activebg { opacity: .8; }
 
     /* ACTIVE TIMER: grows bottom-up from empty to full while skill is active */
     .skill-btn .cooler::after {
@@ -63,23 +62,17 @@
         repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 6px, rgba(255,255,255,0) 6px 12px),
         linear-gradient(180deg, rgba(48,237,255,.35), rgba(28,167,255,.22));
       transition: height 100ms linear; mix-blend-mode: screen;
-      z-index: 1;
     }
-    /* COOLDOWN VEIL: dark overlay that shrinks from bottom to top as cooldown completes */
+    /* COOLDOWN DIM: fades from dim -> clear as cooldown completes (transparent to color) */
     .skill-btn .cooler::before {
       content: ""; position: absolute; inset: 0; border-radius: 14px;
-      background: rgba(0,0,0,0.52);
-      /* Reveal color from bottom to top: when --coolMask=0 (fresh cooldown) -> full veil;
-         when --coolMask=1 (ready OR active) -> fully clipped (no veil). */
-      clip-path: inset(0 0 calc(var(--coolMask, 0) * 100%) 0);
-      transition: clip-path 140ms linear;
-      will-change: clip-path;
-      z-index: 1;
+      background: rgba(0,0,0,0.45);
+      opacity: calc(1 - var(--cool, 0));
+      transition: opacity 120ms linear;
     }
-
     /* Cooldown ring: transparent -> full as cooldown completes */
     .skill-btn .ring {
-      position: absolute; inset: -4px; border-radius: 50%; z-index: 4; pointer-events: none;
+      position: absolute; inset: -4px; border-radius: 50%; z-index: 2; pointer-events: none;
       background: conic-gradient(rgba(255,255,255,.96) calc(var(--cool,0) * 360deg), rgba(255,255,255,0) 0);
       -webkit-mask: radial-gradient(farthest-side, transparent calc(50% - 5px), #000 calc(50% - 5px));
               mask: radial-gradient(farthest-side, transparent calc(50% - 5px), #000 calc(50% - 5px));
@@ -198,9 +191,10 @@
       };
     })();
 
-    /* WebAudio (minimal SFX helpers) */
+    /* WebAudio (minimal SFX helpers retained) */
     const Snd = {
       ctx: null, gain: null, musicGain: null, muted: false,
+      musicTimer: null, rotateTimer: null, trackIdx: 0,
       init() {
         if (this.ctx) return;
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -348,7 +342,14 @@
         [null, "#1b1020", "#af7fbf", "#1b1020", null],
       ],
     };
-    (function normalizeSprites(){ Object.keys(SPRITES).forEach((k)=>{ const s=SPRITES[k]; const w=Math.max(...s.map(r=>r.length)); for(let r=0;r<s.length;r++) for(let c=0;c<w;c++) if(typeof s[r][c]==="undefined") s[r][c]=null; }); })();
+    function normalizeSprites() {
+      Object.keys(SPRITES).forEach((k) => {
+        const s = SPRITES[k];
+        const w = Math.max(...s.map((r) => r.length));
+        for (let r = 0; r < s.length; r++) for (let c = 0; c < w; c++) if (typeof s[r][c] === "undefined") s[r][c] = null;
+      });
+    }
+    normalizeSprites();
 
     /* Icons (SVG) */
     function skillIconSVG(key, size=26) {
@@ -414,12 +415,12 @@
       baseFireInterval: 0.3,
       timeElapsed: 0,
       cameraX: 0, cameraY: 0,
-      lastAimAngle: Math.PI / 6,
+      lastAimAngle: Math.PI / 6, // 4 o'clock
 
       onResize(w, h) {
         this.viewW = w; this.viewH = h;
-        this.cameraX = Math.max(0, Math.min(this.cameraX, this.worldW - this.viewW));
-        this.cameraY = Math.max(0, Math.min(this.cameraY, this.worldH - this.viewH));
+        this.cameraX = clamp(this.cameraX, 0, Math.max(0, this.worldW - this.viewW));
+        this.cameraY = clamp(this.cameraY, 0, Math.max(0, this.worldH - this.viewH));
         clampPlayer();
       },
       reset() {
@@ -461,7 +462,7 @@
     function normalize(x, y) { const m = Math.hypot(x, y) || 1; return { x: x / m, y: y / m }; }
     function circleHit(ax, ay, ar, bx, by, br) { return (ax - bx) * (ax - bx) + (ay - by) * (ay - by) <= (ar + br) * (ar + br); }
 
-    /* Joystick input */
+    /* Transparent joystick visuals + input */
     const joyEl = $("#joystick");
     const knobEl = $("#jKnob");
     const JOY_RADIUS = 44;
@@ -562,7 +563,7 @@
       }
     }
 
-    /* Skills (core data) */
+    /* Skills (unchanged core) */
     const ALL_SKILLS = {
       explosion_active: { name: "Explosion", type: "active", cooldown: 8, maxLevel: 15, duration() { return 0.3; }, activate(level) { const base = 100 + 20 * Math.max(0, level - 1); const mult = 1 + (player._dmg || 0); const dmg = base * mult; radialDamage(player.x, player.y, 92, dmg); createExplosion(player.x, player.y, 92, 0.22); spawnExplosionFX(player.x, player.y); Snd.playExplode(); FarcadeSafe.haptic(); }, },
       shield_active:    { name: "Shield",    type: "active", cooldown: 12, maxLevel: 15, duration(level) { return 5 + 0.5 * Math.max(0, level - 1); }, activate(level) { const dur = 5 + 0.5 * Math.max(0, level - 1); player.invuln = Math.max(player.invuln || 0, dur); Snd.osc("sine", 520, 0.1, 0.08); FarcadeSafe.haptic(); }, },
@@ -574,14 +575,24 @@
       multishot_passive:{ name: "MultiShot", type: "passive", maxLevel: 8, apply(key) { const cur = game.skillLevels[key] || 0; if (cur >= 8) return; player._multishot = (player._multishot || 0) + 1; game.skillLevels[key] = cur + 1; } },
     };
     const ACTIVE_KEYS = ["explosion_active", "shield_active", "quickshot_active"];
+    function isSkillMaxed(k) { const s = ALL_SKILLS[k]; const lv = game.skillLevels[k] || 0; return s && s.type === "active" && lv >= (s.maxLevel || 15); }
+    function equippedSlotOf(k) { for (let i = 0; i < 3; i++) if (game.skillSlots[i] === k) return i; return -1; }
+    function hasEmptySkillSlot() { return game.skillSlots.some((s) => s === null); }
 
     function chooseSkillOptions() {
       const opts = [];
-      const empty = game.skillSlots.some((s)=>s===null);
-      for (const k of ACTIVE_KEYS) { const eq = game.skillSlots.includes(k); const maxed = (game.skillLevels[k]||0) >= (ALL_SKILLS[k].maxLevel||15); if (eq && !maxed) opts.push(k); }
-      if (empty) for (const k of ACTIVE_KEYS) if (!game.skillSlots.includes(k) && (game.skillLevels[k]||0) < (ALL_SKILLS[k].maxLevel||15)) opts.push(k);
-      for (const k of Object.keys(ALL_SKILLS)) { const s=ALL_SKILLS[k]; if (s.type!=="passive") continue; const cur=game.skillLevels[k]||0; if (!s.maxLevel || cur < s.maxLevel) opts.push(k); }
-      const unique=[...new Set(opts)], pick=[]; while(pick.length<3 && unique.length) pick.push(unique.splice(Math.floor(Math.random()*unique.length),1)[0]); return pick;
+      const empty = hasEmptySkillSlot();
+      for (const k of ACTIVE_KEYS) { const eq = equippedSlotOf(k) >= 0; if (eq && !isSkillMaxed(k)) opts.push(k); }
+      if (empty) for (const k of ACTIVE_KEYS) if (equippedSlotOf(k) < 0 && !isSkillMaxed(k)) opts.push(k);
+      for (const k of Object.keys(ALL_SKILLS)) {
+        const s = ALL_SKILLS[k];
+        if (s.type !== "passive") continue;
+        const cur = game.skillLevels[k] || 0;
+        if (!s.maxLevel || cur < s.maxLevel) opts.push(k);
+      }
+      const unique = [...new Set(opts)], pick = [];
+      while (pick.length < 3 && unique.length) pick.push(unique.splice(Math.floor(Math.random() * unique.length), 1)[0]);
+      return pick;
     }
 
     function showLevelUpOverlay() {
@@ -623,7 +634,6 @@
 
     function showGameOverOverlay() {
       const wrap = document.createElement("div"); wrap.className = "overlay"; wrap.id = "gameOver";
-      wrap.style.background = "rgba(2, 6, 23, 0.75)"; // darker background
       wrap.innerHTML = `<div class="choices" style="flex-direction:column;align-items:center;padding:20px;gap:10px">
         <div style="color:#fff;font-weight:800;font-size:18px;text-shadow:0 2px 0 rgba(0,0,0,.6)">Game Over</div>
         <div style="color:#fff;opacity:.9">Score: ${Math.floor(game.score)}</div>
@@ -647,38 +657,24 @@
 
         if (!key) {
           icon.innerHTML = ""; btn.style.opacity = 0.6; btn.setAttribute("disabled","true");
-          cool.style.setProperty("--active","0"); ring.style.setProperty("--cool","0");
-          cool.style.setProperty("--coolMask","1");
+          cool.style.setProperty("--active","0"); ring.style.setProperty("--cool","0"); cool.style.setProperty("--cool","0");
           btn.style.setProperty('--sat', '0.2'); btn.style.setProperty('--bright','0.7');
           btn.classList.remove("ready","active");
         } else {
           icon.innerHTML = skillIconSVG(key, 26); btn.style.opacity = 1; btn.removeAttribute("disabled");
           const cd = game.skillCooldowns[i] || 0; const totalCd = ALL_SKILLS[key].cooldown || 4;
           const coolPct = 1 - Math.max(0, Math.min(1, cd / totalCd)); // 0 -> 1 as it becomes ready
+          ring.style.setProperty("--cool", String(coolPct));
+          cool.style.setProperty("--cool", String(coolPct));
+          // Dim while cooling; fully colored when ready
+          btn.style.setProperty('--sat', String(0.3 + 0.7 * coolPct));
+          btn.style.setProperty('--bright', String(0.75 + 0.25 * coolPct));
+
           const at = game.skillActiveTimers[i] || 0, atTot = game.skillActiveTotals[i] || 1;
           const activePct = atTot > 0 ? 1 - Math.max(0, Math.min(1, at / atTot)) : 0;
-          const isActive = at > 0.0001;
-
-          // Ring shows cooldown progress at all times
-          ring.style.setProperty("--cool", String(coolPct));
-
-          // Reveal color by shrinking the dim veil from bottom to top
-          // While active -> full color (mask=1). After active ends -> resume from current coolPct.
-          const coolMask = isActive ? 1 : coolPct;
-          cool.style.setProperty("--coolMask", String(coolMask));
-
-          // Active progress (bottom-up fill), also toggles tinted overlay
           cool.style.setProperty("--active", String(activePct));
-          btn.classList.toggle("active", isActive);
-
-          // Colorfulness: full while active, else tied to cooldown
-          if (isActive) {
-            btn.style.setProperty('--sat', "1");
-            btn.style.setProperty('--bright', "1");
-          } else {
-            btn.style.setProperty('--sat', String(0.3 + 0.7 * coolPct));
-            btn.style.setProperty('--bright', String(0.75 + 0.25 * coolPct));
-          }
+          // Active state toggles tinted fill (doesn't cover icon)
+          btn.classList.toggle("active", at > 0.0001);
 
           if (cd <= 0) btn.classList.add("ready"); else btn.classList.remove("ready");
         }
@@ -750,7 +746,7 @@
       if (ev) ev.textContent = `${game.waveKills}/${game.waveTotal}`;
     }
 
-    /* World build — reverted house/deco positions; decos use imported images and sit beneath trees */
+    /* World build — reverted house and decoration positions */
     function buildWorld() {
       const W = game.worldW, H = game.worldH;
       game.world.trees = []; game.world.houses = []; game.world.flowers = []; game.world.roads = []; game.world.decos = [];
@@ -783,33 +779,32 @@
         tries++;
         const x = Math.random() * W, y = Math.random() * H, s = 0.9 + Math.random() * 0.8;
         if (!farFromTrees(x, y)) continue;
-        if (nearAnyHouse(x, y, 200)) continue;  // buffer for bigger houses
+        if (nearAnyHouse(x, y, 200)) continue;  // buffer for larger house scale
         if (nearAnyRoad(x, y, 28)) continue;
         const type = Math.floor(Math.random() * 4);
         game.world.trees.push({ x, y, s, type });
       }
 
-      // Decorations (clutter) — always pick a deco key 1..4 so imported images apply later; avoid trees/roads/houses
+      // Decorations (clutter) — positions reverted; assets deco1..4.jpg supported; scaled 2.5x on draw
+      const decoKeys = Object.keys(CUSTOM_DECO_CANVAS);
       const decoCount = 120;
-      const decoTreePad = 60;  // larger so no visual overlap with trees
+      const decoTreePad = 42;
       const decoDecoPad = 36;
       let dtries = 0;
       function farFromDecos(x,y) {
         for (const d of game.world.decos) { const dx=x-d.x, dy=y-d.y; if (dx*dx+dy*dy < decoDecoPad*decoDecoPad) return false; }
         return true;
       }
-      while (game.world.decos.length < decoCount && dtries < decoCount * 80) {
+      while (game.world.decos.length < decoCount && dtries < decoCount * 60) {
         dtries++;
         const x = Math.random() * W, y = Math.random() * H, s = 0.6 + Math.random()*0.8;
         if (nearAnyHouse(x,y,120)) continue;
         if (nearAnyRoad(x,y,30)) continue;
-        // far from trees
         let closeTree = false;
         for (const t of game.world.trees) { const dx=x-t.x, dy=y-t.y; if (dx*dx+dy*dy < decoTreePad*decoTreePad) { closeTree = true; break; } }
         if (closeTree) continue;
         if (!farFromDecos(x,y)) continue;
-        // assign a key deco1..deco4 regardless of load timing; draw will fallback if not loaded
-        const key = `deco${1 + Math.floor(Math.random()*4)}`;
+        const key = decoKeys.length ? decoKeys[Math.floor(Math.random()*decoKeys.length)] : null;
         game.world.decos.push({ x, y, s, key });
       }
 
@@ -939,7 +934,7 @@
         }
       }
 
-      // FX
+      // explosions / FX particles
       for (let i = game.explosions.length - 1; i >= 0; i--) { const ex = game.explosions[i]; ex.ttl -= dt; if (ex.ttl <= 0) game.explosions.splice(i, 1); }
       for (let i = game.fxParticles.length - 1; i >= 0; i--) {
         const p = game.fxParticles[i]; p.ttl -= dt;
@@ -949,9 +944,464 @@
         if (p.ttl <= 0 || p.alpha <= 0) game.fxParticles.splice(i, 1);
       }
 
-      // pickups
+      // pickups motion/magnet
       for (let i = game.pickups.length - 1; i >= 0; i--) {
         const p = game.pickups[i]; p.ttl -= dt;
         const dx = player.x - p.x, dy = player.y - p.y, d = Math.hypot(dx, dy), magnetRange = 120;
         if (d < magnetRange) { const pull = (1 - d / magnetRange) * 320; p.x += (dx / (d || 1)) * pull * dt; p.y += (dy / (d || 1)) * pull * dt; }
-        if (circleHit(p.x, p.y, 8, player.x, player.y, player.r)) { game.xp += p.
+        if (circleHit(p.x, p.y, 8, player.x, player.y, player.r)) { game.xp += p.amt; Snd.playPickup(); FarcadeSafe.haptic(); game.pickups.splice(i, 1); continue; }
+        if (p.ttl <= 0) game.pickups.splice(i, 1);
+      }
+
+      for (let i = 0; i < 3; i++) if (game.skillCooldowns[i] > 0) game.skillCooldowns[i] = Math.max(0, game.skillCooldowns[i] - dt);
+      for (let i = game.damageTexts.length - 1; i >= 0; i--) {
+        const t = game.damageTexts[i]; t.ttl -= dt; t.y += t.vy * dt; t.vy += 40 * dt; if (t.ttl <= 0) game.damageTexts.splice(i, 1);
+      }
+
+      if (player.invuln > 0) player.invuln = Math.max(0, player.invuln - dt);
+      game.score += dt * 0.3;
+      updateSkillButtons();
+
+      if (game.xp >= game.xpToNext) {
+        game.xp -= game.xpToNext; game.level += 1;
+        game.xpToNext = Math.floor(game.xpToNext * 1.35 + game.level * 5);
+        game.paused = true; FarcadeSafe.haptic(); showLevelUpOverlay();
+      }
+
+      if (game.hp <= 0) {
+        game.running = false;
+        FarcadeSafe.haptic();
+        FarcadeSafe.gameOver({ score: Math.floor(game.score), waves: game.wave });
+        showGameOverOverlay();
+        return;
+      }
+
+      player.shootingAnim = Math.max(0, (player.shootingAnim || 0) - dt);
+      render();
+    }
+
+    /* Road draw — warm dirt with soft shoulder and highlight */
+    function drawRoad(pts, width, camX, camY) {
+      ctx.save();
+      ctx.translate(-camX, -camY);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      function strokePath() {
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i];
+          if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+      }
+
+      // Soft shoulder
+      ctx.strokeStyle = "#c9b06b";
+      ctx.lineWidth = width + 10;
+      ctx.globalAlpha = 0.9;
+      strokePath();
+
+      // Main dirt body
+      ctx.strokeStyle = "#e7d58d";
+      ctx.lineWidth = width;
+      ctx.globalAlpha = 1;
+      strokePath();
+
+      // Inner highlight
+      ctx.strokeStyle = "#fff0bf";
+      ctx.lineWidth = Math.max(6, width - 10);
+      ctx.globalAlpha = 0.55;
+      strokePath();
+      ctx.globalAlpha = 1;
+
+      // Light speckle
+      function seedRand(n) { const s = Math.sin(n) * 10000; return s - Math.floor(s); }
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        const vx = b.x - a.x, vy = b.y - a.y;
+        const segLen = Math.hypot(vx, vy) || 1;
+        const nx = -vy / segLen, ny = vx / segLen;
+        const steps = Math.ceil(segLen / 18);
+        for (let j = 0; j <= steps; j++) {
+          const t = j / Math.max(1, steps);
+          const baseX = a.x + vx * t, baseY = a.y + vy * t;
+          const r1 = seedRand(i * 997 + j * 13);
+          if (r1 < 0.45) {
+            const off = (r1 - 0.5) * (width * 0.7);
+            const px = baseX + nx * off, py = baseY + ny * off;
+            ctx.fillStyle = r1 < 0.25 ? "#d8c382" : "#bfa86f";
+            ctx.fillRect(Math.floor(px - 1), Math.floor(py - 1), 2, 2);
+          }
+        }
+      }
+
+      ctx.restore();
+    }
+
+    /* Simple pixel sprite draw helper */
+    function drawPixelSprite(sprite, cx, cy, size=24, center=true) {
+      const rows = sprite.length, cols = sprite[0].length;
+      const scale = size / Math.max(rows, cols);
+      const ox = center ? -cols * scale / 2 : 0;
+      const oy = center ? -rows * scale / 2 : 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const col = sprite[y][x];
+          if (!col) continue;
+          ctx.fillStyle = col;
+          ctx.fillRect(Math.floor(cx + ox + x * scale), Math.floor(cy + oy + y * scale), Math.ceil(scale), Math.ceil(scale));
+        }
+      }
+    }
+
+    /* Rendering */
+    function render() {
+      const vw = game.viewW, vh = game.viewH;
+      const camX = game.cameraX, camY = game.cameraY;
+
+      drawLandscape(camX, camY, vw, vh);
+
+      // explosions + FX
+      for (const ex of game.explosions) {
+        const sx = ex.x - camX, sy = ex.y - camY; const t = Math.max(0, ex.ttl / ex.life);
+        ctx.fillStyle = `rgba(255,120,80,${0.12 + 0.28 * t})`; ctx.beginPath();
+        ctx.arc(sx, sy, ex.r * (1 + (1 - t) * 0.8), 0, Math.PI * 2); ctx.fill();
+      }
+      for (const p of game.fxParticles) {
+        const sx = p.x - camX, sy = p.y - camY;
+        if (p.type === "ring") { ctx.strokeStyle = `rgba(255,200,120,${Math.max(0, p.alpha)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI * 2); ctx.stroke(); }
+        else if (p.type === "spark") { ctx.fillStyle = `hsl(${p.hue}, 90%, 60%)`; ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI * 2); ctx.fill(); }
+        else if (p.type === "smoke") { ctx.fillStyle = `rgba(80,80,80,${p.alpha})`; ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI * 2); ctx.fill(); }
+      }
+
+      // bullets
+      for (const b of game.bullets) {
+        const sx = b.x - camX, sy = b.y - camY;
+        ctx.save(); ctx.translate(sx, sy);
+        ctx.fillStyle = "rgba(255,240,180,0.98)"; ctx.beginPath(); ctx.ellipse(0, 0, b.r, b.r * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+
+      // pickups: static, smaller SIGN badge (no animation)
+      for (const p of game.pickups) {
+        const sx = p.x - camX, sy = p.y - camY;
+        drawSignBadgeStatic(sx, sy);
+      }
+
+      // enemies
+      for (const e of game.enemies) {
+        const sx = e.x - camX, sy = e.y - camY;
+        if (e.elite) { ctx.strokeStyle = "rgba(255,210,80,0.8)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(sx, sy, Math.max(18, e.r*1.2), 0, Math.PI*2); ctx.stroke(); }
+        const img = CUSTOM_SPRITE_CANVAS[e.spriteKey];
+        if (img) {
+          const desiredW = Math.max(24, e.r * 2.2);
+          const aspect = img.width / img.height || 1;
+          const w = desiredW, h = desiredW / aspect;
+          ctx.drawImage(img, Math.floor(sx - w/2), Math.floor(sy - h/2), Math.floor(w), Math.floor(h));
+        } else {
+          const sprite = SPRITES[e.spriteKey] || SPRITES.enemy1;
+          drawPixelSprite(sprite, sx, sy, Math.max(18, e.r * 1.8), true);
+        }
+        ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(sx - e.r, sy - e.r - 8, e.r * 2, 4);
+        ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.fillRect(sx - e.r, sy - e.r - 8, Math.max(0, (e.hp / e.maxHp)) * e.r * 2, 4);
+      }
+
+      // player
+      const psx = player.x - camX, psy = player.y - camY;
+      drawOrangePlayer(psx, psy);
+      if (player.invuln > 0) {
+        const alpha = 0.35 + 0.15 * Math.sin(game.timeElapsed * 8), r = player.r * (1.7 + 0.05 * Math.sin(game.timeElapsed * 6));
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        const g = ctx.createRadialGradient(psx, psy, r * 0.6, psx, psy, r);
+        g.addColorStop(0, `rgba(80,200,255,${alpha})`); g.addColorStop(1, `rgba(28,167,255,${alpha * 0.5})`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(psx, psy, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
+      drawPlayerBow(psx, psy);
+
+      // damage text
+      ctx.textAlign = "center"; ctx.font = "12px system-ui";
+      for (const t of game.damageTexts) { const sx = t.x - camX, sy = t.y - camY; ctx.fillStyle = "rgba(0,0,0,0.45)"; ctx.fillRect(sx-12, sy-10, 24, 14); ctx.fillStyle = "rgba(255,240,220,0.98)"; ctx.fillText(t.val, sx, sy); }
+
+      // Left HUD
+      const pad = SAFE_MARGIN;
+      const plateW = 200, plateH = 92;
+      const barW = 140, barH = 10;
+      ctx.fillStyle = "rgba(0,0,0,0.36)"; roundRect(pad-8, pad-4, plateW, plateH, 10, true, false);
+
+      ctx.fillStyle = "rgba(255,255,255,0.98)"; ctx.font = "14px system-ui, sans-serif"; ctx.textAlign = "left";
+      ctx.fillText(`Score: ${Math.floor(game.score)}`, pad, pad + 14);
+
+      ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "12px system-ui, sans-serif";
+      ctx.fillText(`HP: ${Math.floor(Math.max(0, game.hp))}/${game.maxHp}`, pad, pad + 32);
+      ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fillRect(pad, pad + 38, barW, barH);
+      ctx.fillStyle = "#ff6b6b"; ctx.fillRect(pad, pad + 38, barW * (Math.max(0, game.hp) / game.maxHp), barH);
+      ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.strokeRect(pad, pad + 38, barW, barH);
+
+      ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "12px system-ui, sans-serif";
+      ctx.fillText(`Level ${game.level}`, pad, pad + 60);
+      const lvPct = Math.min(1, game.xp / Math.max(1, game.xpToNext));
+      ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fillRect(pad, pad + 66, barW, barH);
+      const grad = ctx.createLinearGradient(pad, 0, pad + barW, 0); grad.addColorStop(0, "#ff8c2f"); grad.addColorStop(1, "#ff6b00");
+      ctx.fillStyle = grad; ctx.fillRect(pad, pad + 66, barW * lvPct, barH);
+      ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.strokeRect(pad, pad + 66, barW, barH);
+
+      function roundRect(x, y, w, h, r, fill, stroke) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        if (fill) ctx.fill(); if (stroke) ctx.stroke();
+      }
+
+      function drawSignBadgeStatic(x, y) {
+        ctx.save();
+        const w = 36, h = 14, r = 7;
+        // Strong black outline
+        ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,0.95)";
+        roundedPath(x, y, w, h, r); ctx.stroke();
+        // Solid orange fill
+        ctx.fillStyle = "#ff7a1e";
+        roundedPath(x, y, w, h, r); ctx.fill();
+        // Crisp text with black border
+        ctx.font = "900 10px system-ui, sans-serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.lineWidth = 3; ctx.strokeStyle = "#000";
+        ctx.strokeText("SIGN", Math.round(x)+0.5, Math.round(y)+0.5);
+        ctx.fillStyle = "#fff";
+        ctx.fillText("SIGN", Math.round(x)+0.5, Math.round(y)+0.5);
+        ctx.restore();
+
+        function roundedPath(cx, cy, ww, hh, rr) {
+          const x0 = cx - ww/2, y0 = cy - hh/2, x1 = cx + ww/2, y1 = cy + hh/2;
+          ctx.beginPath();
+          ctx.moveTo(x0 + rr, y0);
+          ctx.arcTo(x1, y0, x1, y1, rr);
+          ctx.arcTo(x1, y1, x0, y1, rr);
+          ctx.arcTo(x0, y1, x0, y0, rr);
+          ctx.arcTo(x0, y0, x1, y0, rr);
+          ctx.closePath();
+        }
+      }
+    }
+
+    /* Landscape + trees + houses + decos */
+    function drawLandscape(camX, camY, vw, vh) {
+      if (GRASS_PATTERN) { ctx.fillStyle = GRASS_PATTERN; ctx.fillRect(0, 0, vw, vh); }
+      else {
+        ctx.fillStyle = "#7ccb53"; ctx.fillRect(0, 0, vw, vh);
+        const tile = 16;
+        for (let gx = Math.floor(camX / tile) * tile; gx < camX + vw + tile; gx += tile) {
+          for (let gy = Math.floor(camY / tile) * tile; gy < camY + vh + tile; gy += tile) {
+            const sx = gx - camX, sy = gy - camY;
+            ctx.fillStyle = "#6bb946"; ctx.fillRect(sx + 10, sy + 6, 2, 2);
+            ctx.fillStyle = "#8edc64"; ctx.fillRect(sx + 6, sy + 3, 2, 2);
+          }
+        }
+      }
+
+      for (const road of game.world.roads) drawRoad(road.pts, road.width, camX, camY);
+      for (const h of game.world.houses) drawHouse(h.x - camX, h.y - camY, h.s);
+      for (const t of game.world.trees) drawFancyTree(t.x - camX, t.y - camY, t.s, t.type);
+      for (const d of game.world.decos) drawDeco(d.x - camX, d.y - camY, d.s, d.key);
+
+      // tiny flowers
+      for (let i = 0; i < game.world.flowers.length; i++) {
+        const f = game.world.flowers[i];
+        const sx = f.x - camX, sy = f.y - camY;
+        if (sx < -8 || sx > vw + 8 || sy < -8 || sy > vh + 8) continue;
+        ctx.fillStyle = f.c; ctx.fillRect(Math.round(sx), Math.round(sy), 2, 2);
+      }
+    }
+
+    function drawHouse(x, y, s=1) {
+      ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(s * HOUSE_SCALE, s * HOUSE_SCALE);
+      if (CUSTOM_HOUSE_IMAGE) {
+        const img = CUSTOM_HOUSE_IMAGE;
+        const w = 50, h = 36; // base footprint before scaling
+        ctx.drawImage(img, Math.floor(-w/2), Math.floor(-h+20), Math.floor(w), Math.floor(h));
+        ctx.restore(); return;
+      }
+      // fallback simple house
+      ctx.fillStyle = "#f2e4b3"; ctx.fillRect(-18, 0, 36, 22);
+      ctx.fillStyle = "#5e3a1f"; ctx.fillRect(-4, 8, 8, 14);
+      ctx.fillStyle = "#cc3024"; ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(0, -14); ctx.lineTo(22, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#e0523e"; ctx.beginPath(); ctx.moveTo(-18, 0); ctx.lineTo(0, -10); ctx.lineTo(18, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#d4b36c"; ctx.fillRect(10, 8, 8, 6);
+      ctx.restore();
+    }
+
+    // Trees — no ground shadow; supports tree1..tree4.jpg
+    function drawFancyTree(x, y, s=1, type=0) {
+      ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(s, s);
+      const key = `tree${(type % 4) + 1}`;
+      const img = CUSTOM_TREE_CANVAS[key];
+      if (img) {
+        const desiredH = 48;
+        const aspect = img.width / img.height || 1;
+        const h = desiredH;
+        const w = desiredH * aspect;
+        ctx.drawImage(img, Math.floor(-w/2), Math.floor(-h + 8), Math.floor(w), Math.floor(h));
+        ctx.restore(); return;
+      }
+      // fallback vector styles (no shadow)
+      switch (type % 4) { case 0: drawBroadleaf(); break; case 1: drawTallBroadleaf(); break; case 2: drawConifer(); break; case 3: drawBareTree(); break; }
+      ctx.restore();
+
+      function trunk(h=20, w=6) {
+        const g = ctx.createLinearGradient(0, -h, 0, h);
+        g.addColorStop(0, "#7a4b25"); g.addColorStop(1, "#4e2f18");
+        ctx.fillStyle = g; ctx.fillRect(-w/2, -2, w, h);
+        ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1;
+        for (let i=0;i<3;i++){ ctx.beginPath(); ctx.moveTo(-w/2+1, 2+i*6); ctx.lineTo(w/2-1, 2+i*6); ctx.stroke(); }
+      }
+      function leafBlob(r=18, hue=110) {
+        const base = `hsl(${hue},40%,45%)`, light = `hsl(${hue},60%,70%)`, dark=`hsl(${hue},55%,30%)`;
+        const rg = ctx.createRadialGradient(-6, -8, r*0.2, 0, 0, r);
+        rg.addColorStop(0, light); rg.addColorStop(0.6, base); rg.addColorStop(1, dark);
+        ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(0, -10, r, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.18)";
+        for (let i=0;i<16;i++){ const a=Math.random()*Math.PI*2; const rr=r*(0.2+Math.random()*0.75); ctx.fillRect(Math.cos(a)*rr-1, -10+Math.sin(a)*rr-1, 2, 2); }
+      }
+      function drawBroadleaf() { trunk(24,6); ctx.save(); leafBlob(18, 110); ctx.translate(-9,-4); leafBlob(10, 105); ctx.translate(18,0); leafBlob(10, 115); ctx.restore(); }
+      function drawTallBroadleaf() { trunk(28,6); ctx.save(); leafBlob(14, 95); ctx.translate(0,-8); leafBlob(16, 100); ctx.translate(0,-8); leafBlob(12, 105); ctx.restore(); }
+      function drawConifer() { trunk(24,5); const layers = 5;
+        for (let i=0;i<layers;i++){ const w=28-i*5, h=8, yoff=-14-i*6; const g = ctx.createLinearGradient(0, yoff-h, 0, yoff+h); g.addColorStop(0, "#a7f7a2"); g.addColorStop(1, "#2d8b3e"); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, yoff-h); ctx.lineTo(-w/2, yoff+h); ctx.lineTo(w/2, yoff+h); ctx.closePath(); ctx.fill(); }
+        ctx.fillStyle="#2d8b3e"; ctx.beginPath(); ctx.arc(0, -14-layers*6-3, 3, 0, Math.PI*2); ctx.fill(); }
+      function drawBareTree() { trunk(26,6); ctx.strokeStyle="#4e2f18"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(-10, -16); ctx.moveTo(-2,-6); ctx.lineTo(10,-20); ctx.moveTo(2,-10); ctx.lineTo(14,-28); ctx.stroke(); }
+    }
+
+    function drawDeco(x, y, s=1, key=null) {
+      ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(s * DECO_SCALE, s * DECO_SCALE);
+      if (key && CUSTOM_DECO_CANVAS[key]) {
+        const img = CUSTOM_DECO_CANVAS[key];
+        const w = 22, h = 22;
+        ctx.drawImage(img, Math.floor(-w/2), Math.floor(-h/2), Math.floor(w), Math.floor(h));
+        ctx.restore(); return;
+      }
+      // fallback small stump/rock (scaled up via DECO_SCALE)
+      ctx.fillStyle = "#6b502d"; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "#8a6a3b"; ctx.fillRect(-4, -6, 8, 6);
+      ctx.restore();
+    }
+
+    /* Player visuals */
+    function drawOrangePlayer(cx, cy) {
+      const r = player.r * 1.3;
+      if (CUSTOM_MAIN_SPRITE) {
+        ctx.save(); ctx.translate(cx, cy);
+        ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(0, r * 0.9, r * 0.9, r * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+        const img = CUSTOM_MAIN_SPRITE; const aspect = img.width / img.height || 1;
+        const desiredH = r * 2.2; const h = desiredH; const w = desiredH * aspect;
+        ctx.drawImage(img, Math.floor(-w/2), Math.floor(-h/2), Math.floor(w), Math.floor(h));
+        ctx.restore(); return;
+      }
+      // fallback orange body
+      ctx.save(); ctx.translate(cx, cy);
+      ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(0, r * 0.9, r * 0.9, r * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+      const grad = ctx.createRadialGradient(-r * 0.25, -r * 0.5, r * 0.2, 0, 0, r * 1.05);
+      grad.addColorStop(0, "#ffd68a"); grad.addColorStop(0.35, "#ffb24f"); grad.addColorStop(1, "#ff7a1e");
+      ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#4e3a1f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-2, -r + 6); ctx.lineTo(4, -r - 6); ctx.stroke();
+      const dir = normalize(player.dir.x || 0, player.dir.y || -1); const ang = Math.atan2(dir.y, dir.x);
+      ctx.save(); ctx.translate(4, -r - 6); ctx.rotate(ang * 0.15 - 0.4);
+      const lg = ctx.createLinearGradient(0, 0, 26, 0); lg.addColorStop(0, "#0f7a2f"); lg.addColorStop(1, "#33c165");
+      ctx.fillStyle = lg; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(18, -8, 26, 0); ctx.quadraticCurveTo(18, 8, 0, 0); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.translate(0, -r * 0.1); ctx.rotate(ang * 0.05);
+      const lensW = r * 0.75, lensH = r * 0.34, pad = 3;
+      roundedRect(-lensW - pad, -lensH, lensW, lensH * 2, 9, "#ffffff");
+      roundedRect(pad, -lensH, lensW, lensH * 2, 9, "#ffffff");
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(-pad, -3, pad * 2, 6);
+      ctx.globalAlpha = 0.9; roundedRect(-lensW - pad + 3, -lensH + 3, lensW - 6, lensH * 2 - 6, 7, "#ff6a00");
+      roundedRect(pad + 3, -lensH + 3, lensW - 6, lensH * 2 - 6, 7, "#ff6a00"); ctx.globalAlpha = 1; ctx.restore(); ctx.restore();
+      function roundedRect(x, y, w, h, r, fill) { ctx.fillStyle = fill; ctx.beginPath();
+        ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); ctx.fill();
+      }
+    }
+    function drawPlayerBow(cx, cy) {
+      const ang = game.lastAimAngle;
+      const dir = { x: Math.cos(ang), y: Math.sin(ang) };
+      const perp = { x: -dir.y, y: dir.x };
+      const ox = perp.x * 10 + dir.x * 6, oy = perp.y * 10 + dir.y * 6 + 6;
+
+      ctx.save(); ctx.translate(cx + ox, cy + oy); ctx.rotate(ang);
+      const pullNorm = Math.min(1, player.shootingAnim / 0.22), recoilTilt = -0.06 * pullNorm; ctx.rotate(recoilTilt);
+      ctx.strokeStyle = "#3a2a1f"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(6, 0, 10, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+      ctx.strokeStyle = "#cfcfcf"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-4 - 2 * pullNorm, -9); ctx.lineTo(-4 - 2 * pullNorm, 9); ctx.stroke();
+      ctx.fillStyle = "#ffb24f"; ctx.fillRect(-10, -3, 6, 6);
+      const pull = 10 * pullNorm; ctx.strokeStyle = "#6b3b1f"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-12 - pull, 0); ctx.lineTo(12, 0); ctx.stroke();
+      ctx.fillStyle = "#111827"; ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(8, -3); ctx.lineTo(8, 3); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    /* UI loop */
+    (function uiLoop() {
+      updateWaveBar();
+      updateSkillButtons();
+      requestAnimationFrame(uiLoop);
+    })();
+
+    /* Input setup */
+    const keys = {};
+    window.addEventListener("keydown", (e) => { keys[e.key.toLowerCase()] = true; });
+    window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+
+    function setupSkillButtons() {
+      for (let i = 0; i < 3; i++) {
+        const el = document.getElementById(`skill${i}`);
+        el.addEventListener("touchstart", (e) => { e.preventDefault(); useSkill(i); }, { passive: false });
+        el.addEventListener("mousedown", (e) => { e.preventDefault(); useSkill(i); });
+      }
+    }
+    window.addEventListener("keydown", (e) => { if (e.key === "1") useSkill(0); if (e.key === "2") useSkill(1); if (e.key === "3") useSkill(2); });
+
+    FarcadeSafe.on && FarcadeSafe.on("play_again", () => { document.getElementById("lvlup")?.remove(); document.querySelectorAll(".overlay").forEach((o) => o.remove()); game.reset(); });
+    FarcadeSafe.on && FarcadeSafe.on("toggle_mute", ({ isMuted }) => { game.muted = !!isMuted; Snd.muted = !!isMuted; if (Snd.muted) Snd.stopMusic(); else Snd.startMusic(); });
+
+    /* Boot + Start overlay */
+    function init() {
+      const rect = canvas.getBoundingClientRect();
+      canvas.style.width = rect.width + "px"; canvas.style.height = rect.height + "px";
+      resizeCanvas();
+      setupFullScreenInput(); setupSkillButtons(); updateSkillButtons();
+      for (let i = 0; i < 3; i++) $("#icon"+i).innerHTML = "";
+      loadOptionalEnemyImages();
+      loadOptionalMainSprite();
+      loadOptionalTreeImages();
+      loadOptionalHouseImage();
+      loadOptionalDecos(); // expects deco1.jpg..deco4.jpg if present
+      loadOptionalGrassTile(); // optional: grass.jpg to replace ground
+      setTimeout(() => FarcadeSafe.ready(), 250);
+    }
+    function startGame() {
+      game.reset();
+      game.running = true; game.paused = false;
+      if (!Snd.ctx) { Snd.init(); }
+      Snd.startMusic && Snd.startMusic();
+      if (!game.playLoopReq) game.playLoopReq = requestAnimationFrame(loop);
+    }
+    function boot() {
+      const frame = document.querySelector(".frame");
+      function tryStart() {
+        const r = frame.getBoundingClientRect();
+        if (r.width < 10 || r.height < 10) { requestAnimationFrame(tryStart); return; }
+        canvas.style.width = r.width + "px"; canvas.style.height = r.height + "px";
+        resizeCanvas(); init();
+        const observer = new ResizeObserver(() => {
+          const rr = frame.getBoundingClientRect();
+          canvas.style.width = rr.width + "px"; canvas.style.height = rr.height + "px";
+          resizeCanvas();
+        });
+        observer.observe(frame);
+      }
+      tryStart();
+      $("#startBtn").addEventListener("click", () => { $("#startOverlay")?.remove(); startGame(); });
+    }
+    window.addEventListener("load", boot);
+    window.addEventListener("resize", () => resizeCanvas());
+  </script>
+</body>
+</html>
