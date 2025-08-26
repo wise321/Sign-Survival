@@ -20,7 +20,7 @@
     .touch-layer { position: absolute; inset: 0; pointer-events: none; }
     .skills { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; width: 140px; align-items: flex-end; pointer-events:auto; }
 
-    /* Level-up overlay */
+    /* Level-up & game-over overlays */
     .overlay { position: absolute; inset: 0; background: rgba(2, 6, 23, 0.6); display: flex; align-items: center; justify-content: center; pointer-events: auto; z-index: 8; }
     .choices { display: flex; gap: 12px; padding: 12px; background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
     .choice { width: 88px; height: 100px; min-width: 88px; min-height: 100px; background: #0f1724; border-radius: 10px; color: var(--hud); font-size: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border: 2px solid rgba(255,255,255,0.06); cursor: pointer; padding: 6px 4px; }
@@ -33,9 +33,7 @@
       box-shadow: 0 10px 16px rgba(0,0,0,.5), inset 0 0 0 2px rgba(0,0,0,.2);
       display: grid; place-items: center; color: white; font-weight: 800; font-size: 16px;
       border: 0; position: relative; overflow: hidden; isolation: isolate;
-
-      /* Dim/brighten via CSS vars so "ready" looks fully colored */
-      filter: saturate(var(--sat,1)) brightness(var(--bright,1));
+      filter: saturate(var(--sat,1)) brightness(var(--bright,1)); /* colored when ready; dim while cooling */
     }
     .skill-btn::before {
       content: ""; position: absolute; inset: 0; border-radius: 14px;
@@ -47,6 +45,15 @@
       position: absolute; inset: 0; border-radius: 14px; pointer-events: none; overflow: hidden; z-index: 1;
       box-shadow: inset 0 0 0 2px rgba(0,0,0,.28), inset 0 6px 18px rgba(0,0,0,.35);
     }
+    /* Active tinted fill that doesn't cover the icon (behind icon, in front of cooler) */
+    .skill-btn .activebg {
+      position: absolute; inset: 0; border-radius: 14px; z-index: 1; pointer-events: none;
+      background: linear-gradient(180deg, rgba(48,237,255,.55), rgba(28,167,255,.35));
+      mix-blend-mode: screen;
+      opacity: 0; transition: opacity 120ms linear;
+    }
+    .skill-btn.active .activebg { opacity: .8; }
+
     /* ACTIVE TIMER: grows bottom-up from empty to full while skill is active */
     .skill-btn .cooler::after {
       content: ""; position: absolute; left: 0; right: 0; bottom: 0; top: auto;
@@ -86,7 +93,14 @@
     .wavebar-labels .b { opacity: .95; }
 
     /* Transparent joystick (visual only) */
-    .joystick { position: absolute; width: 110px; height: 110px; left: 80px; bottom: 80px; transform: translate(-50%, -50%); opacity: 0; transition: opacity 120ms ease; pointer-events: none; z-index: 6; }
+    .joystick {
+      position: absolute;
+      width: 110px; height: 110px;
+      left: 80px; bottom: 80px;
+      transform: translate(-50%, -50%);
+      opacity: 0; transition: opacity 120ms ease;
+      pointer-events: none; z-index: 6;
+    }
     .joystick .j-base { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); background: transparent; box-shadow: 0 0 0 2px rgba(0,0,0,0.15) inset; }
     .joystick .j-knob { position: absolute; width: 44px; height: 44px; left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 50%; border: 2px solid rgba(255,255,255,0.75); background: radial-gradient(50% 50% at 40% 35%, rgba(255,255,255,0.45), rgba(255,255,255,0.05)); box-shadow: 0 0 18px rgba(255,255,255,0.25), inset 0 0 0 2px rgba(0,0,0,0.25); }
 
@@ -141,13 +155,13 @@
 
         <div class="skills" id="skills">
           <button class="skill-btn" id="skill0" aria-label="skill1">
-            <div class="cooler"></div><div class="ring"></div><span class="icon" id="icon0"></span>
+            <div class="cooler"></div><div class="activebg"></div><div class="ring"></div><span class="icon" id="icon0"></span>
           </button>
           <button class="skill-btn" id="skill1" aria-label="skill2" style="background: linear-gradient(180deg, #7c5cff, #4f3bd6)">
-            <div class="cooler"></div><div class="ring"></div><span class="icon" id="icon1"></span>
+            <div class="cooler"></div><div class="activebg"></div><div class="ring"></div><span class="icon" id="icon1"></span>
           </button>
           <button class="skill-btn" id="skill2" aria-label="skill3" style="background: linear-gradient(180deg, #35d0de, #1ca7ff)">
-            <div class="cooler"></div><div class="ring"></div><span class="icon" id="icon2"></span>
+            <div class="cooler"></div><div class="activebg"></div><div class="ring"></div><span class="icon" id="icon2"></span>
           </button>
         </div>
       </div>
@@ -236,12 +250,12 @@
       game.onResize(rect.width, rect.height);
     }
 
-    /* Custom images with black chroma-key removal + optional grass tile */
-    const CUSTOM_SPRITE_CANVAS = {};    // enemies
-    let CUSTOM_MAIN_SPRITE = null;      // player
-    const CUSTOM_TREE_CANVAS = {};      // trees: tree1..tree4
+    /* Custom images (with black chroma-key removal) + optional grass tile */
+    const CUSTOM_SPRITE_CANVAS = {};    // enemy1/2/3.jpg
+    let CUSTOM_MAIN_SPRITE = null;      // orange.jpg (player)
+    const CUSTOM_TREE_CANVAS = {};      // tree1..tree4.jpg
     let CUSTOM_HOUSE_IMAGE = null;      // house1.jpg
-    const CUSTOM_DECO_CANVAS = {};      // deco1..4
+    const CUSTOM_DECO_CANVAS = {};      // deco1..4.jpg
     let GRASS_PATTERN = null;           // grass.jpg pattern (optional)
 
     function loadChromaImage(src, key=[0,0,0], tol=40) {
@@ -549,7 +563,7 @@
       }
     }
 
-    /* Skills (unchanged core behavior) */
+    /* Skills (unchanged core) */
     const ALL_SKILLS = {
       explosion_active: { name: "Explosion", type: "active", cooldown: 8, maxLevel: 15, duration() { return 0.3; }, activate(level) { const base = 100 + 20 * Math.max(0, level - 1); const mult = 1 + (player._dmg || 0); const dmg = base * mult; radialDamage(player.x, player.y, 92, dmg); createExplosion(player.x, player.y, 92, 0.22); spawnExplosionFX(player.x, player.y); Snd.playExplode(); FarcadeSafe.haptic(); }, },
       shield_active:    { name: "Shield",    type: "active", cooldown: 12, maxLevel: 15, duration(level) { return 5 + 0.5 * Math.max(0, level - 1); }, activate(level) { const dur = 5 + 0.5 * Math.max(0, level - 1); player.invuln = Math.max(player.invuln || 0, dur); Snd.osc("sine", 520, 0.1, 0.08); FarcadeSafe.haptic(); }, },
@@ -609,6 +623,30 @@
       document.querySelector(".frame").appendChild(wrap);
     }
 
+    function showVictoryOverlay() {
+      const wrap = document.createElement("div"); wrap.className = "overlay";
+      wrap.innerHTML = `<div class="choices" style="flex-direction:column;align-items:center;padding:20px">
+        <div style="color:#fff;font-weight:800;font-size:18px;text-shadow:0 2px 0 rgba(0,0,0,.6)">You cleared Wave ${game.maxWaves}!</div>
+        <div style="color:#fff;opacity:.9;margin-top:6px">Score: ${Math.floor(game.score)}</div>
+      </div>`;
+      document.querySelector(".frame").appendChild(wrap);
+    }
+
+    function showGameOverOverlay() {
+      const wrap = document.createElement("div"); wrap.className = "overlay"; wrap.id = "gameOver";
+      wrap.innerHTML = `<div class="choices" style="flex-direction:column;align-items:center;padding:20px;gap:10px">
+        <div style="color:#fff;font-weight:800;font-size:18px;text-shadow:0 2px 0 rgba(0,0,0,.6)">Game Over</div>
+        <div style="color:#fff;opacity:.9">Score: ${Math.floor(game.score)}</div>
+        <button class="start-btn" id="retryBtn">Restart</button>
+      </div>`;
+      document.querySelector(".frame").appendChild(wrap);
+      document.getElementById("retryBtn").addEventListener("click", () => {
+        document.getElementById("lvlup")?.remove();
+        document.querySelectorAll(".overlay").forEach(o => o.remove());
+        game.reset();
+      });
+    }
+
     function updateSkillButtons() {
       for (let i = 0; i < 3; i++) {
         const btn = document.getElementById(`skill${i}`);
@@ -621,7 +659,7 @@
           icon.innerHTML = ""; btn.style.opacity = 0.6; btn.setAttribute("disabled","true");
           cool.style.setProperty("--active","0"); ring.style.setProperty("--cool","0"); cool.style.setProperty("--cool","0");
           btn.style.setProperty('--sat', '0.2'); btn.style.setProperty('--bright','0.7');
-          btn.classList.remove("ready");
+          btn.classList.remove("ready","active");
         } else {
           icon.innerHTML = skillIconSVG(key, 26); btn.style.opacity = 1; btn.removeAttribute("disabled");
           const cd = game.skillCooldowns[i] || 0; const totalCd = ALL_SKILLS[key].cooldown || 4;
@@ -635,6 +673,8 @@
           const at = game.skillActiveTimers[i] || 0, atTot = game.skillActiveTotals[i] || 1;
           const activePct = atTot > 0 ? 1 - Math.max(0, Math.min(1, at / atTot)) : 0;
           cool.style.setProperty("--active", String(activePct));
+          // Active state toggles tinted fill (doesn't cover icon)
+          btn.classList.toggle("active", at > 0.0001);
 
           if (cd <= 0) btn.classList.add("ready"); else btn.classList.remove("ready");
         }
@@ -696,14 +736,6 @@
       }
       startWave(game.wave + 1);
     }
-    function showVictoryOverlay() {
-      const wrap = document.createElement("div"); wrap.className = "overlay";
-      wrap.innerHTML = `<div class="choices" style="flex-direction:column;align-items:center;padding:20px">
-        <div style="color:#fff;font-weight:800;font-size:18px;text-shadow:0 2px 0 rgba(0,0,0,.6)">You cleared Wave ${game.maxWaves}!</div>
-        <div style="color:#fff;opacity:.9;margin-top:6px">Score: ${Math.floor(game.score)}</div>
-      </div>`;
-      document.querySelector(".frame").appendChild(wrap);
-    }
 
     function updateWaveBar() {
       const fill = $("#waveFill");
@@ -714,25 +746,25 @@
       if (ev) ev.textContent = `${game.waveKills}/${game.waveTotal}`;
     }
 
-    /* World build — revert houses and decoration positions to earlier layout */
+    /* World build — reverted house and decoration positions */
     function buildWorld() {
       const W = game.worldW, H = game.worldH;
       game.world.trees = []; game.world.houses = []; game.world.flowers = []; game.world.roads = []; game.world.decos = [];
 
-      // Roads (visual redesign handled by drawRoad)
+      // Roads
       game.world.roads.push({ pts: [ { x: -120, y: H + 80 }, { x: W * 0.22, y: H * 0.72 }, { x: W * 0.45, y: H * 0.52 }, { x: W * 0.66, y: H * 0.34 }, { x: W + 120, y: -80 } ], width: 46 });
       game.world.roads.push({ pts: [ { x: W * 0.40, y: H * 0.60 }, { x: W * 0.32, y: H * 0.40 }, { x: W * 0.20, y: H * 0.22 }, { x: -120,  y: H * 0.12 } ], width: 38 });
 
-      // Houses — exact earlier coordinates
+      // Houses — original spots
       const houseSpots = [
         { x: W * 0.27, y: H * 0.67, s: 1.15 },
         { x: W * 0.56, y: H * 0.36, s: 1.2 },
         { x: W * 0.40, y: H * 0.52, s: 1.05 },
-        { x: W * 0.18, y: H * 0.25, s: 1.1 }, // original far-left position
+        { x: W * 0.18, y: H * 0.25, s: 1.1 },
       ];
       game.world.houses.push(...houseSpots);
 
-      // Trees: ensure spacing; avoid roads/houses (keep larger buffer around houses for size)
+      // Trees
       const treeCount = 220;
       const minDist = 60;
       let tries = 0;
@@ -747,16 +779,16 @@
         tries++;
         const x = Math.random() * W, y = Math.random() * H, s = 0.9 + Math.random() * 0.8;
         if (!farFromTrees(x, y)) continue;
-        if (nearAnyHouse(x, y, 200)) continue;  // buffer for big houses
+        if (nearAnyHouse(x, y, 200)) continue;  // buffer for larger house scale
         if (nearAnyRoad(x, y, 28)) continue;
         const type = Math.floor(Math.random() * 4);
         game.world.trees.push({ x, y, s, type });
       }
 
-      // Decorations (clutter) — positions reverted, still scaled 2.5x
+      // Decorations (clutter) — positions reverted; assets deco1..4.jpg supported; scaled 2.5x on draw
       const decoKeys = Object.keys(CUSTOM_DECO_CANVAS);
       const decoCount = 120;
-      const decoTreePad = 42;   // reverted pads
+      const decoTreePad = 42;
       const decoDecoPad = 36;
       let dtries = 0;
       function farFromDecos(x,y) {
@@ -766,7 +798,7 @@
       while (game.world.decos.length < decoCount && dtries < decoCount * 60) {
         dtries++;
         const x = Math.random() * W, y = Math.random() * H, s = 0.6 + Math.random()*0.8;
-        if (nearAnyHouse(x,y,120)) continue;     // reverted to earlier keep-away
+        if (nearAnyHouse(x,y,120)) continue;
         if (nearAnyRoad(x,y,30)) continue;
         let closeTree = false;
         for (const t of game.world.trees) { const dx=x-t.x, dy=y-t.y; if (dx*dx+dy*dy < decoTreePad*decoTreePad) { closeTree = true; break; } }
@@ -936,7 +968,13 @@
         game.paused = true; FarcadeSafe.haptic(); showLevelUpOverlay();
       }
 
-      if (game.hp <= 0) { game.running = false; FarcadeSafe.haptic(); FarcadeSafe.gameOver({ score: Math.floor(game.score), waves: game.wave }); return; }
+      if (game.hp <= 0) {
+        game.running = false;
+        FarcadeSafe.haptic();
+        FarcadeSafe.gameOver({ score: Math.floor(game.score), waves: game.wave });
+        showGameOverOverlay();
+        return;
+      }
 
       player.shootingAnim = Math.max(0, (player.shootingAnim || 0) - dt);
       render();
@@ -1118,10 +1156,9 @@
         if (fill) ctx.fill(); if (stroke) ctx.stroke();
       }
 
-      // Smaller static SIGN badge (no animation)
       function drawSignBadgeStatic(x, y) {
         ctx.save();
-        const w = 36, h = 14, r = 7; // smaller than before
+        const w = 36, h = 14, r = 7;
         // Strong black outline
         ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,0.95)";
         roundedPath(x, y, w, h, r); ctx.stroke();
@@ -1152,11 +1189,8 @@
 
     /* Landscape + trees + houses + decos */
     function drawLandscape(camX, camY, vw, vh) {
-      // Base ground — use grass.jpg if present, else flat green with subtle texture
-      if (GRASS_PATTERN) {
-        ctx.fillStyle = GRASS_PATTERN;
-        ctx.fillRect(0, 0, vw, vh);
-      } else {
+      if (GRASS_PATTERN) { ctx.fillStyle = GRASS_PATTERN; ctx.fillRect(0, 0, vw, vh); }
+      else {
         ctx.fillStyle = "#7ccb53"; ctx.fillRect(0, 0, vw, vh);
         const tile = 16;
         for (let gx = Math.floor(camX / tile) * tile; gx < camX + vw + tile; gx += tile) {
@@ -1213,19 +1247,13 @@
         ctx.restore(); return;
       }
       // fallback vector styles (no shadow)
-      switch (type % 4) {
-        case 0: drawBroadleaf(); break;
-        case 1: drawTallBroadleaf(); break;
-        case 2: drawConifer(); break;
-        case 3: drawBareTree(); break;
-      }
+      switch (type % 4) { case 0: drawBroadleaf(); break; case 1: drawTallBroadleaf(); break; case 2: drawConifer(); break; case 3: drawBareTree(); break; }
       ctx.restore();
 
       function trunk(h=20, w=6) {
         const g = ctx.createLinearGradient(0, -h, 0, h);
         g.addColorStop(0, "#7a4b25"); g.addColorStop(1, "#4e2f18");
-        ctx.fillStyle = g;
-        ctx.fillRect(-w/2, -2, w, h);
+        ctx.fillStyle = g; ctx.fillRect(-w/2, -2, w, h);
         ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1;
         for (let i=0;i<3;i++){ ctx.beginPath(); ctx.moveTo(-w/2+1, 2+i*6); ctx.lineTo(w/2-1, 2+i*6); ctx.stroke(); }
       }
@@ -1239,29 +1267,10 @@
       }
       function drawBroadleaf() { trunk(24,6); ctx.save(); leafBlob(18, 110); ctx.translate(-9,-4); leafBlob(10, 105); ctx.translate(18,0); leafBlob(10, 115); ctx.restore(); }
       function drawTallBroadleaf() { trunk(28,6); ctx.save(); leafBlob(14, 95); ctx.translate(0,-8); leafBlob(16, 100); ctx.translate(0,-8); leafBlob(12, 105); ctx.restore(); }
-      function drawConifer() {
-        trunk(24,5);
-        const layers = 5;
-        for (let i=0;i<layers;i++){
-          const w=28-i*5, h=8, yoff=-14-i*6;
-          const g = ctx.createLinearGradient(0, yoff-h, 0, yoff+h);
-          g.addColorStop(0, "#a7f7a2"); g.addColorStop(1, "#2d8b3e");
-          ctx.fillStyle = g;
-          ctx.beginPath();
-          ctx.moveTo(0, yoff-h);
-          ctx.lineTo(-w/2, yoff+h);
-          ctx.lineTo(w/2, yoff+h);
-          ctx.closePath(); ctx.fill();
-        }
-        ctx.fillStyle="#2d8b3e"; ctx.beginPath(); ctx.arc(0, -14-layers*6-3, 3, 0, Math.PI*2); ctx.fill();
-      }
-      function drawBareTree() {
-        trunk(26,6);
-        ctx.strokeStyle="#4e2f18"; ctx.lineWidth=2;
-        ctx.beginPath();
-        ctx.moveTo(0, -2); ctx.lineTo(-10, -16); ctx.moveTo(-2,-6); ctx.lineTo(10,-20); ctx.moveTo(2,-10); ctx.lineTo(14,-28);
-        ctx.stroke();
-      }
+      function drawConifer() { trunk(24,5); const layers = 5;
+        for (let i=0;i<layers;i++){ const w=28-i*5, h=8, yoff=-14-i*6; const g = ctx.createLinearGradient(0, yoff-h, 0, yoff+h); g.addColorStop(0, "#a7f7a2"); g.addColorStop(1, "#2d8b3e"); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, yoff-h); ctx.lineTo(-w/2, yoff+h); ctx.lineTo(w/2, yoff+h); ctx.closePath(); ctx.fill(); }
+        ctx.fillStyle="#2d8b3e"; ctx.beginPath(); ctx.arc(0, -14-layers*6-3, 3, 0, Math.PI*2); ctx.fill(); }
+      function drawBareTree() { trunk(26,6); ctx.strokeStyle="#4e2f18"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(-10, -16); ctx.moveTo(-2,-6); ctx.lineTo(10,-20); ctx.moveTo(2,-10); ctx.lineTo(14,-28); ctx.stroke(); }
     }
 
     function drawDeco(x, y, s=1, key=null) {
@@ -1363,8 +1372,8 @@
       loadOptionalMainSprite();
       loadOptionalTreeImages();
       loadOptionalHouseImage();
-      loadOptionalDecos();
-      loadOptionalGrassTile(); // optional: use grass.jpg to replace ground
+      loadOptionalDecos(); // expects deco1.jpg..deco4.jpg if present
+      loadOptionalGrassTile(); // optional: grass.jpg to replace ground
       setTimeout(() => FarcadeSafe.ready(), 250);
     }
     function startGame() {
