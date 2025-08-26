@@ -20,7 +20,7 @@
     .touch-layer { position: absolute; inset: 0; pointer-events: none; }
     .skills { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; width: 140px; align-items: flex-end; pointer-events:auto; }
 
-    /* Overlays */
+    /* Level-up overlay */
     .overlay { position: absolute; inset: 0; background: rgba(2, 6, 23, 0.6); display: flex; align-items: center; justify-content: center; pointer-events: auto; z-index: 8; }
     .choices { display: flex; gap: 12px; padding: 12px; background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
     .choice { width: 88px; height: 100px; min-width: 88px; min-height: 100px; background: #0f1724; border-radius: 10px; color: var(--hud); font-size: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border: 2px solid rgba(255,255,255,0.06); cursor: pointer; padding: 6px 4px; }
@@ -33,8 +33,6 @@
       box-shadow: 0 10px 16px rgba(0,0,0,.5), inset 0 0 0 2px rgba(0,0,0,.2);
       display: grid; place-items: center; color: white; font-weight: 800; font-size: 16px;
       border: 0; position: relative; overflow: hidden; isolation: isolate;
-      /* Colored when ready; dim while cooling via CSS vars */
-      filter: saturate(var(--sat,1)) brightness(var(--bright,1));
     }
     .skill-btn::before {
       content: ""; position: absolute; inset: 0; border-radius: 14px;
@@ -42,49 +40,41 @@
       mix-blend-mode: screen; pointer-events: none;
     }
     .skill-btn .icon { position: relative; z-index: 3; width: 26px; height: 26px; filter: drop-shadow(0 1px 0 rgba(0,0,0,.5)); }
+
+    /* Cooler layer controls both "dim while cooling" and "active fill progress" */
     .skill-btn .cooler {
       position: absolute; inset: 0; border-radius: 14px; pointer-events: none; overflow: hidden; z-index: 1;
       box-shadow: inset 0 0 0 2px rgba(0,0,0,.28), inset 0 6px 18px rgba(0,0,0,.35);
     }
-    /* Active tinted fill behind the icon (visible only while active) */
-    .skill-btn .activebg {
-      position: absolute; inset: 0; border-radius: 14px; z-index: 2; pointer-events: none;
-      background: linear-gradient(180deg, rgba(48,237,255,.55), rgba(28,167,255,.35));
-      mix-blend-mode: screen;
-      opacity: 0; transition: opacity 120ms linear;
-    }
-    .skill-btn.active .activebg { opacity: .9; }
-
-    /* ACTIVE TIMER: grows bottom-up from empty to full while skill is active */
-    .skill-btn .cooler::after {
-      content: ""; position: absolute; left: 0; right: 0; bottom: 0; top: auto;
-      height: calc(var(--active, 0) * 100%);
-      background:
-        repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 6px, rgba(255,255,255,0) 6px 12px),
-        linear-gradient(180deg, rgba(48,237,255,.35), rgba(28,167,255,.22));
-      transition: height 100ms linear; mix-blend-mode: screen;
-      z-index: 1;
-    }
-    /* COOLDOWN VEIL: dark overlay that shrinks from bottom to top as cooldown completes */
+    /* Dim while cooling: starts dim, fades clear to reveal full color when ready */
     .skill-btn .cooler::before {
       content: ""; position: absolute; inset: 0; border-radius: 14px;
-      background: rgba(0,0,0,0.52);
-      /* Reveal color from bottom to top: when --coolMask=0 (fresh cooldown) -> full veil;
-         when --coolMask=1 (ready OR active) -> fully clipped (no veil). */
-      clip-path: inset(0 0 calc(var(--coolMask, 0) * 100%) 0);
-      transition: clip-path 140ms linear;
-      will-change: clip-path;
-      z-index: 1;
+      background: rgba(0,0,0,0.45);
+      opacity: calc(1 - var(--cool, 0));
+      transition: opacity 120ms linear;
     }
-
-    /* Cooldown ring: transparent -> full as cooldown completes */
+    /* Active timer fill: grows bottom -> top during active duration (subtle, under icon) */
+    .skill-btn .cooler::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: 0;
+      height: calc(var(--active, 0) * 100%);
+      background:
+        repeating-linear-gradient(135deg, rgba(48,237,255,.35) 0 6px, rgba(28,167,255,.22) 6px 12px),
+        linear-gradient(180deg, rgba(48,237,255,.35), rgba(28,167,255,.22));
+      transition: height 100ms linear;
+      mix-blend-mode: screen;
+    }
+    /* Ready progress ring: transparent -> white as it becomes ready */
     .skill-btn .ring {
-      position: absolute; inset: -4px; border-radius: 50%; z-index: 4; pointer-events: none;
-      background: conic-gradient(rgba(255,255,255,.96) calc(var(--cool,0) * 360deg), rgba(255,255,255,0) 0);
+      position: absolute; inset: -4px; border-radius: 50%; z-index: 2; pointer-events: none;
+      background: conic-gradient(rgba(255,255,255,.96) calc(var(--cool,0) * 360deg), transparent 0);
       -webkit-mask: radial-gradient(farthest-side, transparent calc(50% - 5px), #000 calc(50% - 5px));
               mask: radial-gradient(farthest-side, transparent calc(50% - 5px), #000 calc(50% - 5px));
-      opacity: .95; transition: background 100ms linear, opacity 120ms ease;
+      opacity: .9; transition: background 100ms linear, opacity 120ms ease;
       box-shadow: 0 0 8px rgba(0,0,0,.35);
+    }
+    /* Active state: a light tint that doesn't cover the icon (sits behind icon, above base color) */
+    .skill-btn.active .cooler {
+      background: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.06));
     }
     .skill-btn.ready { box-shadow: 0 0 24px rgba(255,158,43,.55), 0 10px 16px rgba(0,0,0,.5); }
     .skill-btn[disabled] { opacity: .48; pointer-events: none; }
@@ -123,6 +113,13 @@
     .start-btn { margin-top: 14px; padding: 10px 18px; border: 0; border-radius: 10px; color: white; font-weight: 800; background: linear-gradient(180deg, #ff9a3c, #ff6a00); box-shadow: 0 10px 18px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.18); }
     .start-btn:active { transform: translateY(1px); }
 
+    /* Game over overlay (darker) */
+    .game-over-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.88); display: grid; place-items: center; z-index: 9; }
+    .game-over-card { background: rgba(15, 23, 36, 0.7); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 18px 16px; color: #fff; text-align: center; width: 80%; max-width: 320px; }
+    .game-over-card .t { font: 800 18px/1 system-ui, sans-serif; margin-bottom: 6px; }
+    .game-over-card .s { opacity: .9; margin-bottom: 12px; }
+    .game-over-card .btn { padding: 10px 16px; border: 0; border-radius: 10px; color: white; font-weight: 800; background: linear-gradient(180deg, #35d0de, #1ca7ff); box-shadow: 0 10px 18px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.18); }
+
     @media (max-width: 340px) {
       .skills { width: 120px; }
       .skill-btn { width: 52px; height: 52px; }
@@ -154,7 +151,6 @@
       </div>
 
       <div class="touch-layer" id="touchLayer">
-        <!-- Transparent, movable joystick (visual only) -->
         <div class="joystick" id="joystick">
           <div class="j-base"></div>
           <div class="j-knob" id="jKnob"></div>
@@ -162,13 +158,13 @@
 
         <div class="skills" id="skills">
           <button class="skill-btn" id="skill0" aria-label="skill1">
-            <div class="cooler"></div><div class="activebg"></div><div class="ring"></div><span class="icon" id="icon0"></span>
+            <div class="cooler"></div><div class="ring"></div><span class="icon" id="icon0"></span>
           </button>
           <button class="skill-btn" id="skill1" aria-label="skill2" style="background: linear-gradient(180deg, #7c5cff, #4f3bd6)">
-            <div class="cooler"></div><div class="activebg"></div><div class="ring"></div><span class="icon" id="icon1"></span>
+            <div class="cooler"></div><div class="ring"></div><span class="icon" id="icon1"></span>
           </button>
           <button class="skill-btn" id="skill2" aria-label="skill3" style="background: linear-gradient(180deg, #35d0de, #1ca7ff)">
-            <div class="cooler"></div><div class="activebg"></div><div class="ring"></div><span class="icon" id="icon2"></span>
+            <div class="cooler"></div><div class="ring"></div><span class="icon" id="icon2"></span>
           </button>
         </div>
       </div>
@@ -235,7 +231,7 @@
       playShot() { this.osc("triangle", 520, 0.07, 0.07, 'gain', 0.005, 0.06); this.noise(0.05, 0.07, 900); },
       playExplode() { this.noise(0.2, 0.26, 160); this.osc("sine", 160, 0.14, 0.08, 'gain', 0.005, 0.12); },
       playPickup() { this.osc("triangle", 1000, 0.12, 0.08, 'gain', 0.01, 0.08); },
-      setTrack() {}, nextTrack(){}, startMusic(){}, stopMusic() {}
+      startMusic(){}, stopMusic(){}
     };
 
     const $ = (s, root = document) => root.querySelector(s);
@@ -256,12 +252,12 @@
       game.onResize(rect.width, rect.height);
     }
 
-    /* Custom images (with black chroma-key removal) + optional grass tile */
-    const CUSTOM_SPRITE_CANVAS = {};    // enemy1/2/3.jpg
-    let CUSTOM_MAIN_SPRITE = null;      // orange.jpg (player)
-    const CUSTOM_TREE_CANVAS = {};      // tree1..tree4.jpg
+    /* Custom images with black chroma-key removal + optional grass tile */
+    const CUSTOM_SPRITE_CANVAS = {};    // enemies
+    let CUSTOM_MAIN_SPRITE = null;      // player
+    const CUSTOM_TREE_CANVAS = {};      // trees: tree1..tree4
     let CUSTOM_HOUSE_IMAGE = null;      // house1.jpg
-    const CUSTOM_DECO_CANVAS = {};      // deco1..4.jpg
+    const CUSTOM_DECO_CANVAS = {};      // deco1..deco4
     let GRASS_PATTERN = null;           // grass.jpg pattern (optional)
 
     function loadChromaImage(src, key=[0,0,0], tol=40) {
@@ -348,7 +344,14 @@
         [null, "#1b1020", "#af7fbf", "#1b1020", null],
       ],
     };
-    (function normalizeSprites(){ Object.keys(SPRITES).forEach((k)=>{ const s=SPRITES[k]; const w=Math.max(...s.map(r=>r.length)); for(let r=0;r<s.length;r++) for(let c=0;c<w;c++) if(typeof s[r][c]==="undefined") s[r][c]=null; }); })();
+    function normalizeSprites() {
+      Object.keys(SPRITES).forEach((k) => {
+        const s = SPRITES[k];
+        const w = Math.max(...s.map((r) => r.length));
+        for (let r = 0; r < s.length; r++) for (let c = 0; c < w; c++) if (typeof s[r][c] === "undefined") s[r][c] = null;
+      });
+    }
+    normalizeSprites();
 
     /* Icons (SVG) */
     function skillIconSVG(key, size=26) {
@@ -365,8 +368,8 @@
     }
 
     /* Game state */
-    const HOUSE_SCALE = 2.5; // 2.5x houses
-    const DECO_SCALE  = 2.5; // 2.5x clutter decorations
+    const HOUSE_SCALE = 2.5;
+    const DECO_SCALE = 2.5;
 
     const game = {
       worldW: 1920,
@@ -418,8 +421,8 @@
 
       onResize(w, h) {
         this.viewW = w; this.viewH = h;
-        this.cameraX = Math.max(0, Math.min(this.cameraX, this.worldW - this.viewW));
-        this.cameraY = Math.max(0, Math.min(this.cameraY, this.worldH - this.viewH));
+        this.cameraX = clamp(this.cameraX, 0, Math.max(0, this.worldW - this.viewW));
+        this.cameraY = clamp(this.cameraY, 0, Math.max(0, this.worldH - this.viewH));
         clampPlayer();
       },
       reset() {
@@ -441,13 +444,16 @@
         player.invuln = 0; player.shootingAnim = 0; this.shootTimer = 0;
         player._hasteT = 0; player._hasteMult = 1;
 
+        this.playLoopReq = null;
         buildWorld();
         startWave(this.wave);
       },
     };
 
     const player = {
-      x: 960, y: 756, r: 18, speed: 160, dir: { x: Math.cos(Math.PI/6), y: Math.sin(Math.PI/6) }, color: "#ffa93a",
+      x: 960, y: 756, r: 18, speed: 160,
+      dir: { x: Math.cos(Math.PI/6), y: Math.sin(Math.PI/6) },
+      color: "#ffa93a",
       invuln: 0, _regen: 0, _xpBoost: 0, _dmg: 0, _multishot: 0,
       shootingAnim: 0, walkAnim: 0,
       _hasteT: 0, _hasteMult: 1,
@@ -503,12 +509,10 @@
       };
       const end = () => { game.pointerActive = false; game.joystickVec.x = 0; game.joystickVec.y = 0; setJoyVisible(false); setKnob(0,0); };
 
-      // Touch
       canvas.addEventListener("touchstart", (e) => { const t = e.touches[0]; start(t.clientX, t.clientY, true); }, { passive: true });
       canvas.addEventListener("touchmove",  (e) => { const t = e.touches[0]; move(t.clientX, t.clientY); }, { passive: true });
       canvas.addEventListener("touchend", end);
 
-      // Mouse
       canvas.addEventListener("mousedown", (e) => { start(e.clientX, e.clientY, false); });
       window.addEventListener("mousemove", (e) => { move(e.clientX, e.clientY); });
       window.addEventListener("mouseup", end);
@@ -562,7 +566,7 @@
       }
     }
 
-    /* Skills (core data) */
+    /* Skills */
     const ALL_SKILLS = {
       explosion_active: { name: "Explosion", type: "active", cooldown: 8, maxLevel: 15, duration() { return 0.3; }, activate(level) { const base = 100 + 20 * Math.max(0, level - 1); const mult = 1 + (player._dmg || 0); const dmg = base * mult; radialDamage(player.x, player.y, 92, dmg); createExplosion(player.x, player.y, 92, 0.22); spawnExplosionFX(player.x, player.y); Snd.playExplode(); FarcadeSafe.haptic(); }, },
       shield_active:    { name: "Shield",    type: "active", cooldown: 12, maxLevel: 15, duration(level) { return 5 + 0.5 * Math.max(0, level - 1); }, activate(level) { const dur = 5 + 0.5 * Math.max(0, level - 1); player.invuln = Math.max(player.invuln || 0, dur); Snd.osc("sine", 520, 0.1, 0.08); FarcadeSafe.haptic(); }, },
@@ -574,14 +578,24 @@
       multishot_passive:{ name: "MultiShot", type: "passive", maxLevel: 8, apply(key) { const cur = game.skillLevels[key] || 0; if (cur >= 8) return; player._multishot = (player._multishot || 0) + 1; game.skillLevels[key] = cur + 1; } },
     };
     const ACTIVE_KEYS = ["explosion_active", "shield_active", "quickshot_active"];
+    function isSkillMaxed(k) { const s = ALL_SKILLS[k]; const lv = game.skillLevels[k] || 0; return s && s.type === "active" && lv >= (s.maxLevel || 15); }
+    function equippedSlotOf(k) { for (let i = 0; i < 3; i++) if (game.skillSlots[i] === k) return i; return -1; }
+    function hasEmptySkillSlot() { return game.skillSlots.some((s) => s === null); }
 
     function chooseSkillOptions() {
       const opts = [];
-      const empty = game.skillSlots.some((s)=>s===null);
-      for (const k of ACTIVE_KEYS) { const eq = game.skillSlots.includes(k); const maxed = (game.skillLevels[k]||0) >= (ALL_SKILLS[k].maxLevel||15); if (eq && !maxed) opts.push(k); }
-      if (empty) for (const k of ACTIVE_KEYS) if (!game.skillSlots.includes(k) && (game.skillLevels[k]||0) < (ALL_SKILLS[k].maxLevel||15)) opts.push(k);
-      for (const k of Object.keys(ALL_SKILLS)) { const s=ALL_SKILLS[k]; if (s.type!=="passive") continue; const cur=game.skillLevels[k]||0; if (!s.maxLevel || cur < s.maxLevel) opts.push(k); }
-      const unique=[...new Set(opts)], pick=[]; while(pick.length<3 && unique.length) pick.push(unique.splice(Math.floor(Math.random()*unique.length),1)[0]); return pick;
+      const empty = hasEmptySkillSlot();
+      for (const k of ACTIVE_KEYS) { const eq = equippedSlotOf(k) >= 0; if (eq && !isSkillMaxed(k)) opts.push(k); }
+      if (empty) for (const k of ACTIVE_KEYS) if (equippedSlotOf(k) < 0 && !isSkillMaxed(k)) opts.push(k);
+      for (const k of Object.keys(ALL_SKILLS)) {
+        const s = ALL_SKILLS[k];
+        if (s.type !== "passive") continue;
+        const cur = game.skillLevels[k] || 0;
+        if (!s.maxLevel || cur < s.maxLevel) opts.push(k);
+      }
+      const unique = [...new Set(opts)], pick = [];
+      while (pick.length < 3 && unique.length) pick.push(unique.splice(Math.floor(Math.random() * unique.length), 1)[0]);
+      return pick;
     }
 
     function showLevelUpOverlay() {
@@ -597,44 +611,20 @@
           <div style="font-weight:700">${info.name}</div>
           <small style="opacity:.85">${subtitle}</small>`;
         c.addEventListener("click", () => {
-          if (info.type === "passive") { info.apply && info.apply(k); }
+          if (info.type === "passive") { if (info.apply) info.apply(k); }
           else {
             const max = info.maxLevel || 15; const existing = game.skillLevels[k] || 0;
-            if (existing >= max) {}
+            if (existing >= max) { /* already maxed */ }
             else if (existing > 0) game.skillLevels[k] = Math.min(max, existing + 1);
             else { const slot = game.skillSlots.findIndex((s) => s === null); if (slot >= 0) { game.skillSlots[slot] = k; game.skillCooldowns[slot] = 0; game.skillLevels[k] = 1; updateSkillButtons(); } }
           }
-          document.getElementById("lvlup")?.remove(); game.paused = false;
+          const lvl = document.getElementById("lvlup"); if (lvl) lvl.remove();
+          game.paused = false;
         });
         choicesWrap.appendChild(c);
       });
       wrap.appendChild(choicesWrap);
       document.querySelector(".frame").appendChild(wrap);
-    }
-
-    function showVictoryOverlay() {
-      const wrap = document.createElement("div"); wrap.className = "overlay";
-      wrap.innerHTML = `<div class="choices" style="flex-direction:column;align-items:center;padding:20px">
-        <div style="color:#fff;font-weight:800;font-size:18px;text-shadow:0 2px 0 rgba(0,0,0,.6)">You cleared Wave ${game.maxWaves}!</div>
-        <div style="color:#fff;opacity:.9;margin-top:6px">Score: ${Math.floor(game.score)}</div>
-      </div>`;
-      document.querySelector(".frame").appendChild(wrap);
-    }
-
-    function showGameOverOverlay() {
-      const wrap = document.createElement("div"); wrap.className = "overlay"; wrap.id = "gameOver";
-      wrap.style.background = "rgba(2, 6, 23, 0.75)"; // darker background
-      wrap.innerHTML = `<div class="choices" style="flex-direction:column;align-items:center;padding:20px;gap:10px">
-        <div style="color:#fff;font-weight:800;font-size:18px;text-shadow:0 2px 0 rgba(0,0,0,.6)">Game Over</div>
-        <div style="color:#fff;opacity:.9">Score: ${Math.floor(game.score)}</div>
-        <button class="start-btn" id="retryBtn">Restart</button>
-      </div>`;
-      document.querySelector(".frame").appendChild(wrap);
-      document.getElementById("retryBtn").addEventListener("click", () => {
-        document.getElementById("lvlup")?.remove();
-        document.querySelectorAll(".overlay").forEach(o => o.remove());
-        game.reset();
-      });
     }
 
     function updateSkillButtons() {
@@ -648,37 +638,18 @@
         if (!key) {
           icon.innerHTML = ""; btn.style.opacity = 0.6; btn.setAttribute("disabled","true");
           cool.style.setProperty("--active","0"); ring.style.setProperty("--cool","0");
-          cool.style.setProperty("--coolMask","1");
-          btn.style.setProperty('--sat', '0.2'); btn.style.setProperty('--bright','0.7');
           btn.classList.remove("ready","active");
         } else {
           icon.innerHTML = skillIconSVG(key, 26); btn.style.opacity = 1; btn.removeAttribute("disabled");
           const cd = game.skillCooldowns[i] || 0; const totalCd = ALL_SKILLS[key].cooldown || 4;
-          const coolPct = 1 - Math.max(0, Math.min(1, cd / totalCd)); // 0 -> 1 as it becomes ready
+          const coolPct = 1 - Math.max(0, Math.min(1, cd / totalCd)); // 0 -> 1 toward ready
+          ring.style.setProperty("--cool", String(coolPct));
+          cool.style.setProperty("--cool", String(coolPct));
+
           const at = game.skillActiveTimers[i] || 0, atTot = game.skillActiveTotals[i] || 1;
           const activePct = atTot > 0 ? 1 - Math.max(0, Math.min(1, at / atTot)) : 0;
-          const isActive = at > 0.0001;
-
-          // Ring shows cooldown progress at all times
-          ring.style.setProperty("--cool", String(coolPct));
-
-          // Reveal color by shrinking the dim veil from bottom to top
-          // While active -> full color (mask=1). After active ends -> resume from current coolPct.
-          const coolMask = isActive ? 1 : coolPct;
-          cool.style.setProperty("--coolMask", String(coolMask));
-
-          // Active progress (bottom-up fill), also toggles tinted overlay
           cool.style.setProperty("--active", String(activePct));
-          btn.classList.toggle("active", isActive);
-
-          // Colorfulness: full while active, else tied to cooldown
-          if (isActive) {
-            btn.style.setProperty('--sat', "1");
-            btn.style.setProperty('--bright', "1");
-          } else {
-            btn.style.setProperty('--sat', String(0.3 + 0.7 * coolPct));
-            btn.style.setProperty('--bright', String(0.75 + 0.25 * coolPct));
-          }
+          btn.classList.toggle("active", at > 0);
 
           if (cd <= 0) btn.classList.add("ready"); else btn.classList.remove("ready");
         }
@@ -740,6 +711,32 @@
       }
       startWave(game.wave + 1);
     }
+    function showVictoryOverlay() {
+      const wrap = document.createElement("div"); wrap.className = "overlay";
+      wrap.innerHTML = `<div class="choices" style="flex-direction:column;align-items:center;padding:20px">
+        <div style="color:#fff;font-weight:800;font-size:18px;text-shadow:0 2px 0 rgba(0,0,0,.6)">You cleared Wave ${game.maxWaves}!</div>
+        <div style="color:#fff;opacity:.9;margin-top:6px">Score: ${Math.floor(game.score)}</div>
+      </div>`;
+      document.querySelector(".frame").appendChild(wrap);
+    }
+
+    function showGameOverOverlay() {
+      const wrap = document.createElement("div"); wrap.className = "game-over-overlay"; wrap.id = "gameOver";
+      wrap.innerHTML = `
+        <div class="game-over-card">
+          <div class="t">Game Over</div>
+          <div class="s">Waves: ${game.wave} • Score: ${Math.floor(game.score)}</div>
+          <button class="btn" id="retryBtn">Restart</button>
+        </div>`;
+      document.querySelector(".frame").appendChild(wrap);
+      const r = document.getElementById("retryBtn");
+      if (r) r.addEventListener("click", () => {
+        const lvl = document.getElementById("lvlup"); if (lvl) lvl.remove();
+        const go = document.getElementById("gameOver"); if (go) go.remove();
+        game.reset();
+        if (!game.playLoopReq) game.playLoopReq = requestAnimationFrame(loop);
+      });
+    }
 
     function updateWaveBar() {
       const fill = $("#waveFill");
@@ -750,16 +747,16 @@
       if (ev) ev.textContent = `${game.waveKills}/${game.waveTotal}`;
     }
 
-    /* World build — reverted house/deco positions; decos use imported images and sit beneath trees */
+    /* World build */
     function buildWorld() {
       const W = game.worldW, H = game.worldH;
       game.world.trees = []; game.world.houses = []; game.world.flowers = []; game.world.roads = []; game.world.decos = [];
 
-      // Roads
+      // roads
       game.world.roads.push({ pts: [ { x: -120, y: H + 80 }, { x: W * 0.22, y: H * 0.72 }, { x: W * 0.45, y: H * 0.52 }, { x: W * 0.66, y: H * 0.34 }, { x: W + 120, y: -80 } ], width: 46 });
       game.world.roads.push({ pts: [ { x: W * 0.40, y: H * 0.60 }, { x: W * 0.32, y: H * 0.40 }, { x: W * 0.20, y: H * 0.22 }, { x: -120,  y: H * 0.12 } ], width: 38 });
 
-      // Houses — original spots
+      // houses (original spots; note: with scale they may overlap roads)
       const houseSpots = [
         { x: W * 0.27, y: H * 0.67, s: 1.15 },
         { x: W * 0.56, y: H * 0.36, s: 1.2 },
@@ -783,33 +780,32 @@
         tries++;
         const x = Math.random() * W, y = Math.random() * H, s = 0.9 + Math.random() * 0.8;
         if (!farFromTrees(x, y)) continue;
-        if (nearAnyHouse(x, y, 200)) continue;  // buffer for bigger houses
+        if (nearAnyHouse(x, y, 250)) continue;
         if (nearAnyRoad(x, y, 28)) continue;
         const type = Math.floor(Math.random() * 4);
         game.world.trees.push({ x, y, s, type });
       }
 
-      // Decorations (clutter) — always pick a deco key 1..4 so imported images apply later; avoid trees/roads/houses
+      // Decorations — avoid roads/houses and keep away from trees; will draw beneath trees
+      const decoKeys = Object.keys(CUSTOM_DECO_CANVAS);
       const decoCount = 120;
-      const decoTreePad = 60;  // larger so no visual overlap with trees
+      const decoTreePad = 50;  // a bit more room around trees
       const decoDecoPad = 36;
       let dtries = 0;
       function farFromDecos(x,y) {
         for (const d of game.world.decos) { const dx=x-d.x, dy=y-d.y; if (dx*dx+dy*dy < decoDecoPad*decoDecoPad) return false; }
         return true;
       }
-      while (game.world.decos.length < decoCount && dtries < decoCount * 80) {
+      while (game.world.decos.length < decoCount && dtries < decoCount * 60) {
         dtries++;
         const x = Math.random() * W, y = Math.random() * H, s = 0.6 + Math.random()*0.8;
-        if (nearAnyHouse(x,y,120)) continue;
+        if (nearAnyHouse(x,y,250)) continue;
         if (nearAnyRoad(x,y,30)) continue;
-        // far from trees
-        let closeTree = false;
-        for (const t of game.world.trees) { const dx=x-t.x, dy=y-t.y; if (dx*dx+dy*dy < decoTreePad*decoTreePad) { closeTree = true; break; } }
-        if (closeTree) continue;
+        let tooClose = false;
+        for (const t of game.world.trees) { const dx=x-t.x, dy=y-t.y; if (dx*dx+dy*dy < decoTreePad*decoTreePad) { tooClose = true; break; } }
+        if (tooClose) continue;
         if (!farFromDecos(x,y)) continue;
-        // assign a key deco1..deco4 regardless of load timing; draw will fallback if not loaded
-        const key = `deco${1 + Math.floor(Math.random()*4)}`;
+        const key = decoKeys.length ? decoKeys[Math.floor(Math.random()*decoKeys.length)] : null;
         game.world.decos.push({ x, y, s, key });
       }
 
@@ -939,7 +935,7 @@
         }
       }
 
-      // FX
+      // explosions / FX particles
       for (let i = game.explosions.length - 1; i >= 0; i--) { const ex = game.explosions[i]; ex.ttl -= dt; if (ex.ttl <= 0) game.explosions.splice(i, 1); }
       for (let i = game.fxParticles.length - 1; i >= 0; i--) {
         const p = game.fxParticles[i]; p.ttl -= dt;
@@ -949,9 +945,223 @@
         if (p.ttl <= 0 || p.alpha <= 0) game.fxParticles.splice(i, 1);
       }
 
-      // pickups
+      // pickups motion/magnet
       for (let i = game.pickups.length - 1; i >= 0; i--) {
         const p = game.pickups[i]; p.ttl -= dt;
         const dx = player.x - p.x, dy = player.y - p.y, d = Math.hypot(dx, dy), magnetRange = 120;
         if (d < magnetRange) { const pull = (1 - d / magnetRange) * 320; p.x += (dx / (d || 1)) * pull * dt; p.y += (dy / (d || 1)) * pull * dt; }
-        if (circleHit(p.x, p.y, 8, player.x, player.y, player.r)) { game.xp += p.
+        if (circleHit(p.x, p.y, 8, player.x, player.y, player.r)) { game.xp += p.amt; Snd.playPickup(); FarcadeSafe.haptic(); game.pickups.splice(i, 1); continue; }
+        if (p.ttl <= 0) game.pickups.splice(i, 1);
+      }
+
+      for (let i = 0; i < 3; i++) if (game.skillCooldowns[i] > 0) game.skillCooldowns[i] = Math.max(0, game.skillCooldowns[i] - dt);
+      for (let i = game.damageTexts.length - 1; i >= 0; i--) {
+        const t = game.damageTexts[i]; t.ttl -= dt; t.y += t.vy * dt; t.vy += 40 * dt; if (t.ttl <= 0) game.damageTexts.splice(i, 1);
+      }
+
+      if (player.invuln > 0) player.invuln = Math.max(0, player.invuln - dt);
+      game.score += dt * 0.3;
+      updateSkillButtons();
+
+      if (game.xp >= game.xpToNext) {
+        game.xp -= game.xpToNext; game.level += 1;
+        game.xpToNext = Math.floor(game.xpToNext * 1.35 + game.level * 5);
+        game.paused = true; FarcadeSafe.haptic(); showLevelUpOverlay();
+      }
+
+      if (game.hp <= 0) {
+        game.running = false; game.paused = true;
+        FarcadeSafe.haptic(); FarcadeSafe.gameOver({ score: Math.floor(game.score), waves: game.wave });
+        showGameOverOverlay();
+        return;
+      }
+
+      player.shootingAnim = Math.max(0, (player.shootingAnim || 0) - dt);
+      render();
+    }
+
+    /* Road draw (dirt) */
+    function drawRoad(pts, width, camX, camY) {
+      ctx.save();
+      ctx.translate(-camX, -camY);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      function strokePath() {
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i];
+          if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = "#c9b06b"; ctx.lineWidth = width + 10; ctx.globalAlpha = 0.9; strokePath();
+      ctx.strokeStyle = "#e7d58d"; ctx.lineWidth = width; ctx.globalAlpha = 1; strokePath();
+      ctx.strokeStyle = "#fff0bf"; ctx.lineWidth = Math.max(6, width - 10); ctx.globalAlpha = 0.55; strokePath();
+      ctx.globalAlpha = 1;
+
+      function seedRand(n) { const s = Math.sin(n) * 10000; return s - Math.floor(s); }
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        const vx = b.x - a.x, vy = b.y - a.y;
+        const segLen = Math.hypot(vx, vy) || 1;
+        const nx = -vy / segLen, ny = vx / segLen;
+        const steps = Math.ceil(segLen / 18);
+        for (let j = 0; j <= steps; j++) {
+          const t = j / Math.max(1, steps);
+          const baseX = a.x + vx * t, baseY = a.y + vy * t;
+          const r1 = seedRand(i * 997 + j * 13);
+          if (r1 < 0.45) {
+            const off = (r1 - 0.5) * (width * 0.7);
+            const px = baseX + nx * off, py = baseY + ny * off;
+            ctx.fillStyle = r1 < 0.25 ? "#d8c382" : "#bfa86f";
+            ctx.fillRect(Math.floor(px - 1), Math.floor(py - 1), 2, 2);
+          }
+        }
+      }
+
+      ctx.restore();
+    }
+
+    /* Simple pixel sprite draw helper */
+    function drawPixelSprite(sprite, cx, cy, size=24, center=true) {
+      const rows = sprite.length, cols = sprite[0].length;
+      const scale = size / Math.max(rows, cols);
+      const ox = center ? -cols * scale / 2 : 0;
+      const oy = center ? -rows * scale / 2 : 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const col = sprite[y][x];
+          if (!col) continue;
+          ctx.fillStyle = col;
+          ctx.fillRect(Math.floor(cx + ox + x * scale), Math.floor(cy + oy + y * scale), Math.ceil(scale), Math.ceil(scale));
+        }
+      }
+    }
+
+    /* Rendering */
+    function render() {
+      const vw = game.viewW, vh = game.viewH;
+      const camX = game.cameraX, camY = game.cameraY;
+
+      drawLandscape(camX, camY, vw, vh);
+
+      // explosions + FX
+      for (const ex of game.explosions) {
+        const sx = ex.x - camX, sy = ex.y - camY; const t = Math.max(0, ex.ttl / ex.life);
+        ctx.fillStyle = `rgba(255,120,80,${0.12 + 0.28 * t})`; ctx.beginPath();
+        ctx.arc(sx, sy, ex.r * (1 + (1 - t) * 0.8), 0, Math.PI * 2); ctx.fill();
+      }
+      for (const p of game.fxParticles) {
+        const sx = p.x - camX, sy = p.y - camY;
+        if (p.type === "ring") { ctx.strokeStyle = `rgba(255,200,120,${Math.max(0, p.alpha)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI * 2); ctx.stroke(); }
+        else if (p.type === "spark") { ctx.fillStyle = `hsl(${p.hue}, 90%, 60%)`; ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI * 2); ctx.fill(); }
+        else if (p.type === "smoke") { ctx.fillStyle = `rgba(80,80,80,${p.alpha})`; ctx.beginPath(); ctx.arc(sx, sy, p.r, 0, Math.PI * 2); ctx.fill(); }
+      }
+
+      // bullets
+      for (const b of game.bullets) {
+        const sx = b.x - camX, sy = b.y - camY;
+        ctx.save(); ctx.translate(sx, sy);
+        ctx.fillStyle = "rgba(255,240,180,0.98)"; ctx.beginPath(); ctx.ellipse(0, 0, b.r, b.r * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+
+      // pickups: static "Sign"
+      for (const p of game.pickups) {
+        const sx = p.x - camX, sy = p.y - camY;
+        ctx.save();
+        ctx.font = "bold 10px system-ui, sans-serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,0.75)"; ctx.strokeText("Sign", Math.round(sx)+0.5, Math.round(sy)+0.5);
+        ctx.lineWidth = 2; ctx.strokeStyle = "rgba(255,180,60,0.9)"; ctx.strokeText("Sign", Math.round(sx)+0.5, Math.round(sy)+0.5);
+        const lg = ctx.createLinearGradient(sx-12, sy-6, sx+12, sy+6);
+        lg.addColorStop(0, "#fff0bf"); lg.addColorStop(0.35, "#ffb24f"); lg.addColorStop(0.6, "#ff6a00"); lg.addColorStop(1, "#fff0bf");
+        ctx.fillStyle = lg;
+        ctx.shadowColor = `rgba(255,180,60,0.9)`;
+        ctx.shadowBlur = 15;
+        ctx.fillText("Sign", Math.round(sx)+0.5, Math.round(sy)+0.5);
+        ctx.restore();
+      }
+
+      // enemies
+      for (const e of game.enemies) {
+        const sx = e.x - camX, sy = e.y - camY;
+        if (e.elite) { ctx.strokeStyle = "rgba(255,210,80,0.8)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(sx, sy, Math.max(18, e.r*1.2), 0, Math.PI*2); ctx.stroke(); }
+        const img = CUSTOM_SPRITE_CANVAS[e.spriteKey];
+        if (img) {
+          const desiredW = Math.max(24, e.r * 2.2);
+          const aspect = img.width / img.height || 1;
+          const w = desiredW, h = desiredW / aspect;
+          ctx.drawImage(img, Math.floor(sx - w/2), Math.floor(sy - h/2), Math.floor(w), Math.floor(h));
+        } else {
+          const sprite = SPRITES[e.spriteKey] || SPRITES.enemy1;
+          drawPixelSprite(sprite, sx, sy, Math.max(18, e.r * 1.8), true);
+        }
+        ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(sx - e.r, sy - e.r - 8, e.r * 2, 4);
+        ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.fillRect(sx - e.r, sy - e.r - 8, Math.max(0, (e.hp / e.maxHp)) * e.r * 2, 4);
+      }
+
+      // player
+      const psx = player.x - camX, psy = player.y - camY;
+      drawOrangePlayer(psx, psy);
+      if (player.invuln > 0) {
+        const alpha = 0.35 + 0.15 * Math.sin(game.timeElapsed * 8), r = player.r * (1.7 + 0.05 * Math.sin(game.timeElapsed * 6));
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        const g = ctx.createRadialGradient(psx, psy, r * 0.6, psx, psy, r);
+        g.addColorStop(0, `rgba(80,200,255,${alpha})`); g.addColorStop(1, `rgba(28,167,255,${alpha * 0.5})`);
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(psx, psy, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
+      drawPlayerBow(psx, psy);
+
+      // damage text
+      ctx.textAlign = "center"; ctx.font = "12px system-ui";
+      for (const t of game.damageTexts) { const sx = t.x - camX, sy = t.y - camY; ctx.fillStyle = "rgba(0,0,0,0.45)"; ctx.fillRect(sx-12, sy-10, 24, 14); ctx.fillStyle = "rgba(255,240,220,0.98)"; ctx.fillText(t.val, sx, sy); }
+
+      // Left HUD
+      const pad = SAFE_MARGIN;
+      const plateW = 200, plateH = 92;
+      const barW = 140, barH = 10;
+      ctx.fillStyle = "rgba(0,0,0,0.36)"; roundRect(pad-8, pad-4, plateW, plateH, 10, true, false);
+
+      ctx.fillStyle = "rgba(255,255,255,0.98)"; ctx.font = "14px system-ui, sans-serif"; ctx.textAlign = "left";
+      ctx.fillText(`Score: ${Math.floor(game.score)}`, pad, pad + 14);
+
+      ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "12px system-ui, sans-serif";
+      ctx.fillText(`HP: ${Math.floor(Math.max(0, game.hp))}/${game.maxHp}`, pad, pad + 32);
+      ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fillRect(pad, pad + 38, barW, barH);
+      ctx.fillStyle = "#ff6b6b"; ctx.fillRect(pad, pad + 38, barW * (Math.max(0, game.hp) / game.maxHp), barH);
+      ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.strokeRect(pad, pad + 38, barW, barH);
+
+      ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "12px system-ui, sans-serif";
+      ctx.fillText(`Level ${game.level}`, pad, pad + 60);
+      const lvPct = Math.min(1, game.xp / Math.max(1, game.xpToNext));
+      ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fillRect(pad, pad + 66, barW, barH);
+      const grad = ctx.createLinearGradient(pad, 0, pad + barW, 0); grad.addColorStop(0, "#ff8c2f"); grad.addColorStop(1, "#ff6b00");
+      ctx.fillStyle = grad; ctx.fillRect(pad, pad + 66, barW * lvPct, barH);
+      ctx.strokeStyle = "rgba(255,255,255,0.06)"; ctx.strokeRect(pad, pad + 66, barW, barH);
+
+      function roundRect(x, y, w, h, r, fill, stroke) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        if (fill) ctx.fill(); if (stroke) ctx.stroke();
+      }
+    }
+
+    /* Landscape + trees + houses + decos */
+    function drawLandscape(camX, camY, vw, vh) {
+      if (GRASS_PATTERN) {
+        ctx.fillStyle = GRASS_PATTERN;
+        ctx.fillRect(0, 0, vw, vh);
+      } else {
+        ctx.fillStyle = "#7ccb53"; ctx.fillRect(0, 0, vw, vh);
+        const tile = 16;
+        for (let gx = Math.floor(camX / tile) * tile; gx < camX + vw + tile; gx += tile) {
+          for (let gy = Math.floor(camY / tile) * tile; gy < camY + vh + tile; gy += tile) {
+            const sx = gx - camX, sy = gy - camY;
+            ctx.fillStyle =
