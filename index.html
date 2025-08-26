@@ -34,7 +34,7 @@
       display: grid; place-items: center; color: white; font-weight: 800; font-size: 16px;
       border: 0; position: relative; overflow: hidden; isolation: isolate;
 
-      /* Dim/brighten via CSS variables so "ready" looks fully colored */
+      /* Dim/brighten via CSS vars so "ready" looks fully colored */
       filter: saturate(var(--sat,1)) brightness(var(--bright,1));
     }
     .skill-btn::before {
@@ -86,31 +86,9 @@
     .wavebar-labels .b { opacity: .95; }
 
     /* Transparent joystick (visual only) */
-    .joystick {
-      position: absolute;
-      width: 110px; height: 110px;
-      left: 80px; bottom: 80px;
-      transform: translate(-50%, -50%);
-      opacity: 0; transition: opacity 120ms ease;
-      pointer-events: none; z-index: 6;
-    }
-    .joystick .j-base {
-      position: absolute; inset: 0;
-      border-radius: 50%;
-      border: 2px solid rgba(255,255,255,0.35);
-      background: transparent;
-      box-shadow: 0 0 0 2px rgba(0,0,0,0.15) inset;
-    }
-    .joystick .j-knob {
-      position: absolute; width: 44px; height: 44px; left: 50%; top: 50%;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      border: 2px solid rgba(255,255,255,0.75);
-      background: radial-gradient(50% 50% at 40% 35%, rgba(255,255,255,0.45), rgba(255,255,255,0.05));
-      box-shadow:
-        0 0 18px rgba(255,255,255,0.25),
-        inset 0 0 0 2px rgba(0,0,0,0.25);
-    }
+    .joystick { position: absolute; width: 110px; height: 110px; left: 80px; bottom: 80px; transform: translate(-50%, -50%); opacity: 0; transition: opacity 120ms ease; pointer-events: none; z-index: 6; }
+    .joystick .j-base { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); background: transparent; box-shadow: 0 0 0 2px rgba(0,0,0,0.15) inset; }
+    .joystick .j-knob { position: absolute; width: 44px; height: 44px; left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 50%; border: 2px solid rgba(255,255,255,0.75); background: radial-gradient(50% 50% at 40% 35%, rgba(255,255,255,0.45), rgba(255,255,255,0.05)); box-shadow: 0 0 18px rgba(255,255,255,0.25), inset 0 0 0 2px rgba(0,0,0,0.25); }
 
     /* Start overlay */
     .start-overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(8, 10, 18, .8); z-index: 10; }
@@ -647,13 +625,12 @@
         } else {
           icon.innerHTML = skillIconSVG(key, 26); btn.style.opacity = 1; btn.removeAttribute("disabled");
           const cd = game.skillCooldowns[i] || 0; const totalCd = ALL_SKILLS[key].cooldown || 4;
-          // Reverse cooldown: 0 -> 1 as it becomes ready (button becomes fully colored at 1)
-          const coolPct = 1 - Math.max(0, Math.min(1, cd / totalCd));
+          const coolPct = 1 - Math.max(0, Math.min(1, cd / totalCd)); // 0 -> 1 as it becomes ready
           ring.style.setProperty("--cool", String(coolPct));
           cool.style.setProperty("--cool", String(coolPct));
-          // Dim when cooling, fully colored when ready
-          btn.style.setProperty('--sat', String(0.2 + 0.8 * coolPct));
-          btn.style.setProperty('--bright', String(0.7 + 0.3 * coolPct));
+          // Dim while cooling; fully colored when ready
+          btn.style.setProperty('--sat', String(0.3 + 0.7 * coolPct));
+          btn.style.setProperty('--bright', String(0.75 + 0.25 * coolPct));
 
           const at = game.skillActiveTimers[i] || 0, atTot = game.skillActiveTotals[i] || 1;
           const activePct = atTot > 0 ? 1 - Math.max(0, Math.min(1, at / atTot)) : 0;
@@ -732,30 +709,30 @@
       const fill = $("#waveFill");
       const pct = Math.min(1, game.waveKills / Math.max(1, game.waveTotal));
       if (fill) fill.style.width = `${pct * 100}%`;
-      const wv = $("#waveValue"), ev = $("#enemyValue"];
+      const wv = $("#waveValue"), ev = $("#enemyValue");
       if (wv) wv.textContent = `${game.wave}/${game.maxWaves}`;
       if (ev) ev.textContent = `${game.waveKills}/${game.waveTotal}`;
     }
 
-    /* World build — revert houses and decoration placement to previous layout */
+    /* World build — revert houses and decoration positions to earlier layout */
     function buildWorld() {
       const W = game.worldW, H = game.worldH;
       game.world.trees = []; game.world.houses = []; game.world.flowers = []; game.world.roads = []; game.world.decos = [];
 
-      // Roads
+      // Roads (visual redesign handled by drawRoad)
       game.world.roads.push({ pts: [ { x: -120, y: H + 80 }, { x: W * 0.22, y: H * 0.72 }, { x: W * 0.45, y: H * 0.52 }, { x: W * 0.66, y: H * 0.34 }, { x: W + 120, y: -80 } ], width: 46 });
       game.world.roads.push({ pts: [ { x: W * 0.40, y: H * 0.60 }, { x: W * 0.32, y: H * 0.40 }, { x: W * 0.20, y: H * 0.22 }, { x: -120,  y: H * 0.12 } ], width: 38 });
 
-      // Houses — reverted to the previous fixed spots (far-left already moved off-road earlier)
+      // Houses — exact earlier coordinates
       const houseSpots = [
         { x: W * 0.27, y: H * 0.67, s: 1.15 },
         { x: W * 0.56, y: H * 0.36, s: 1.2 },
         { x: W * 0.40, y: H * 0.52, s: 1.05 },
-        { x: W * 0.14, y: H * 0.30, s: 1.1 },
+        { x: W * 0.18, y: H * 0.25, s: 1.1 }, // original far-left position
       ];
       game.world.houses.push(...houseSpots);
 
-      // Trees: spaced; avoid roads/houses
+      // Trees: ensure spacing; avoid roads/houses (keep larger buffer around houses for size)
       const treeCount = 220;
       const minDist = 60;
       let tries = 0;
@@ -770,17 +747,17 @@
         tries++;
         const x = Math.random() * W, y = Math.random() * H, s = 0.9 + Math.random() * 0.8;
         if (!farFromTrees(x, y)) continue;
-        if (nearAnyHouse(x, y, 200)) continue;  // keep trees a bit away from larger houses
+        if (nearAnyHouse(x, y, 200)) continue;  // buffer for big houses
         if (nearAnyRoad(x, y, 28)) continue;
         const type = Math.floor(Math.random() * 4);
         game.world.trees.push({ x, y, s, type });
       }
 
-      // Decorations (clutter) — 2.5x size but positions/spacing reverted (less strict pads)
+      // Decorations (clutter) — positions reverted, still scaled 2.5x
       const decoKeys = Object.keys(CUSTOM_DECO_CANVAS);
       const decoCount = 120;
-      const decoTreePad = 42;   // reverted
-      const decoDecoPad = 36;   // reverted
+      const decoTreePad = 42;   // reverted pads
+      const decoDecoPad = 36;
       let dtries = 0;
       function farFromDecos(x,y) {
         for (const d of game.world.decos) { const dx=x-d.x, dy=y-d.y; if (dx*dx+dy*dy < decoDecoPad*decoDecoPad) return false; }
@@ -789,8 +766,8 @@
       while (game.world.decos.length < decoCount && dtries < decoCount * 60) {
         dtries++;
         const x = Math.random() * W, y = Math.random() * H, s = 0.6 + Math.random()*0.8;
-        if (nearAnyHouse(x,y,200)) continue;     // keep away from houses (unchanged)
-        if (nearAnyRoad(x,y,30)) continue;       // reverted road padding
+        if (nearAnyHouse(x,y,120)) continue;     // reverted to earlier keep-away
+        if (nearAnyRoad(x,y,30)) continue;
         let closeTree = false;
         for (const t of game.world.trees) { const dx=x-t.x, dy=y-t.y; if (dx*dx+dy*dy < decoTreePad*decoTreePad) { closeTree = true; break; } }
         if (closeTree) continue;
@@ -1141,17 +1118,18 @@
         if (fill) ctx.fill(); if (stroke) ctx.stroke();
       }
 
+      // Smaller static SIGN badge (no animation)
       function drawSignBadgeStatic(x, y) {
         ctx.save();
-        const w = 40, h = 16, r = 8; // smaller
-        // Thick black outline
+        const w = 36, h = 14, r = 7; // smaller than before
+        // Strong black outline
         ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,0.95)";
         roundedPath(x, y, w, h, r); ctx.stroke();
         // Solid orange fill
         ctx.fillStyle = "#ff7a1e";
         roundedPath(x, y, w, h, r); ctx.fill();
         // Crisp text with black border
-        ctx.font = "900 11px system-ui, sans-serif";
+        ctx.font = "900 10px system-ui, sans-serif";
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.lineWidth = 3; ctx.strokeStyle = "#000";
         ctx.strokeText("SIGN", Math.round(x)+0.5, Math.round(y)+0.5);
