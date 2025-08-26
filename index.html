@@ -44,9 +44,10 @@
       position: absolute; inset: 0; border-radius: 14px; pointer-events: none; overflow: hidden; z-index: 1;
       box-shadow: inset 0 0 0 2px rgba(0,0,0,.28), inset 0 6px 18px rgba(0,0,0,.35);
     }
+    /* ACTIVE TIMER: fill grows from empty (0) to full (1), bottom-up */
     .skill-btn .cooler::after {
-      content: ""; position: absolute; left: 0; right: 0; top: 0;
-      height: calc((1 - var(--active, 0)) * 100%);
+      content: ""; position: absolute; left: 0; right: 0; bottom: 0; top: auto;
+      height: calc(var(--active, 0) * 100%);
       background:
         repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 6px, rgba(255,255,255,0) 6px 12px),
         linear-gradient(180deg, rgba(48,237,255,.35), rgba(28,167,255,.22));
@@ -163,8 +164,6 @@
         </div>
       </div>
 
-      <!-- Bottom level indicator intentionally removed -->
-
       <!-- Start overlay -->
       <div class="start-overlay" id="startOverlay">
         <div class="start-card">
@@ -251,12 +250,13 @@
       game.onResize(rect.width, rect.height);
     }
 
-    /* Custom images with black chroma-key removal */
+    /* Custom images with black chroma-key removal + optional grass tile */
     const CUSTOM_SPRITE_CANVAS = {};    // enemies
     let CUSTOM_MAIN_SPRITE = null;      // player
     const CUSTOM_TREE_CANVAS = {};      // trees: tree1..tree4
     let CUSTOM_HOUSE_IMAGE = null;      // house1.jpg
     const CUSTOM_DECO_CANVAS = {};      // deco1..4
+    let GRASS_PATTERN = null;           // grass.jpg pattern (optional)
 
     function loadChromaImage(src, key=[0,0,0], tol=40) {
       return new Promise((resolve) => {
@@ -308,6 +308,18 @@
         if (c) CUSTOM_DECO_CANVAS[`deco${i}`] = c;
       }
     }
+    function loadOptionalGrassTile(src = "grass.jpg") {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          try { GRASS_PATTERN = ctx.createPattern(img, "repeat"); } catch(e) { GRASS_PATTERN = null; }
+          resolve(!!GRASS_PATTERN);
+        };
+        img.onerror = () => resolve(false);
+        img.src = src;
+      });
+    }
 
     /* Pixel fallback sprites (enemies only) */
     const SPRITES = {
@@ -354,6 +366,8 @@
     }
 
     /* Game state */
+    const HOUSE_SCALE = 2.5; // 2.5x house size
+
     const game = {
       worldW: 1920,
       worldH: 1080,
@@ -644,7 +658,8 @@
           const coolPct = 1 - Math.max(0, Math.min(1, cd / totalCd));
           ring.style.setProperty("--cool", String(coolPct));
           const at = game.skillActiveTimers[i] || 0, atTot = game.skillActiveTotals[i] || 1;
-          const activePct = Math.max(0, Math.min(1, at / atTot));
+          // Active fill now goes 0 -> 1 while the skill is active
+          const activePct = atTot > 0 ? 1 - Math.max(0, Math.min(1, at / atTot)) : 0;
           cool.style.setProperty("--active", String(activePct));
           if (cd <= 0) btn.classList.add("ready"); else btn.classList.remove("ready");
         }
@@ -729,15 +744,16 @@
       const W = game.worldW, H = game.worldH;
       game.world.trees = []; game.world.houses = []; game.world.flowers = []; game.world.roads = []; game.world.decos = [];
 
-      // roads and houses
+      // roads (redesigned visuals applied in drawRoad)
       game.world.roads.push({ pts: [ { x: -120, y: H + 80 }, { x: W * 0.22, y: H * 0.72 }, { x: W * 0.45, y: H * 0.52 }, { x: W * 0.66, y: H * 0.34 }, { x: W + 120, y: -80 } ], width: 46 });
       game.world.roads.push({ pts: [ { x: W * 0.40, y: H * 0.60 }, { x: W * 0.32, y: H * 0.40 }, { x: W * 0.20, y: H * 0.22 }, { x: -120,  y: H * 0.12 } ], width: 38 });
 
+      // houses (far-left moved off the road), scaled by HOUSE_SCALE during draw
       const houseSpots = [
         { x: W * 0.27, y: H * 0.67, s: 1.15 },
         { x: W * 0.56, y: H * 0.36, s: 1.2 },
         { x: W * 0.40, y: H * 0.52, s: 1.05 },
-        { x: W * 0.18, y: H * 0.25, s: 1.1 },
+        { x: W * 0.14, y: H * 0.30, s: 1.1 }, // moved left house to side of the road
       ];
       game.world.houses.push(...houseSpots);
 
@@ -756,13 +772,13 @@
         tries++;
         const x = Math.random() * W, y = Math.random() * H, s = 0.9 + Math.random() * 0.8;
         if (!farFromTrees(x, y)) continue;
-        if (nearAnyHouse(x, y, 110)) continue;
+        if (nearAnyHouse(x, y, 200)) continue;  // increased to account for larger houses
         if (nearAnyRoad(x, y, 28)) continue;
         const type = Math.floor(Math.random() * 4); // four types
         game.world.trees.push({ x, y, s, type });
       }
 
-      // Decorations (deco1..4) — avoid roads/houses and stay away from trees
+      // Decorations — avoid roads/houses and stay away from trees
       const decoKeys = Object.keys(CUSTOM_DECO_CANVAS);
       const decoCount = 120;
       const decoTreePad = 42;
@@ -775,7 +791,7 @@
       while (game.world.decos.length < decoCount && dtries < decoCount * 60) {
         dtries++;
         const x = Math.random() * W, y = Math.random() * H, s = 0.6 + Math.random()*0.8;
-        if (nearAnyHouse(x,y,120)) continue;
+        if (nearAnyHouse(x,y,200)) continue;     // increased radius for bigger houses
         if (nearAnyRoad(x,y,30)) continue;
         // not too close to trees
         let closeTree = false;
@@ -952,20 +968,62 @@
       render();
     }
 
-    /* Road draw */
+    /* Road draw — redesigned to match attached reference */
     function drawRoad(pts, width, camX, camY) {
-      ctx.save(); ctx.translate(-camX, -camY);
-      ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
-      ctx.strokeStyle = "#e9d584";
-      ctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const p = pts[i];
-        if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      ctx.save();
+      ctx.translate(-camX, -camY);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      function strokePath() {
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i];
+          if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
-      ctx.globalCompositeOperation = "multiply";
-      ctx.strokeStyle = "rgba(0,0,0,0.12)";
-      ctx.stroke();
+
+      // Soft shoulder
+      ctx.strokeStyle = "#c9b06b";
+      ctx.lineWidth = width + 10;
+      ctx.globalAlpha = 0.9;
+      strokePath();
+
+      // Main dirt body
+      ctx.strokeStyle = "#e7d58d";
+      ctx.lineWidth = width;
+      ctx.globalAlpha = 1;
+      strokePath();
+
+      // Inner highlight
+      ctx.strokeStyle = "#fff0bf";
+      ctx.lineWidth = Math.max(6, width - 10);
+      ctx.globalAlpha = 0.55;
+      strokePath();
+      ctx.globalAlpha = 1;
+
+      // Light speckle
+      function seedRand(n) { const s = Math.sin(n) * 10000; return s - Math.floor(s); }
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        const vx = b.x - a.x, vy = b.y - a.y;
+        const segLen = Math.hypot(vx, vy) || 1;
+        const nx = -vy / segLen, ny = vx / segLen;
+        const steps = Math.ceil(segLen / 18);
+        for (let j = 0; j <= steps; j++) {
+          const t = j / Math.max(1, steps);
+          const baseX = a.x + vx * t, baseY = a.y + vy * t;
+          const r1 = seedRand(i * 997 + j * 13);
+          if (r1 < 0.45) {
+            const off = (r1 - 0.5) * (width * 0.7);
+            const px = baseX + nx * off, py = baseY + ny * off;
+            ctx.fillStyle = r1 < 0.25 ? "#d8c382" : "#bfa86f";
+            ctx.fillRect(Math.floor(px - 1), Math.floor(py - 1), 2, 2);
+          }
+        }
+      }
+
       ctx.restore();
     }
 
@@ -1013,25 +1071,18 @@
         ctx.restore();
       }
 
-      // pickups: tiny glowing "Sign" (strong contrast + subtle pulsing)
+      // pickups: readable "Sign" with black outline/shadow
       for (const p of game.pickups) {
         const sx = p.x - camX, sy = p.y - camY;
         const pulse = 0.6 + 0.4 * Math.sin(game.timeElapsed * 6 + (p.seed || 0));
         ctx.save();
         ctx.font = "bold 11px system-ui, sans-serif";
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        // strong dark outline
         ctx.lineWidth = 4; ctx.strokeStyle = "rgba(0,0,0,0.75)"; ctx.strokeText("Sign", Math.round(sx)+0.5, Math.round(sy)+0.5);
-        // inner bright outline
         ctx.lineWidth = 2; ctx.strokeStyle = "rgba(255,180,60,0.9)"; ctx.strokeText("Sign", Math.round(sx)+0.5, Math.round(sy)+0.5);
-        // metallic gradient fill
         const lg = ctx.createLinearGradient(sx-12, sy-6, sx+12, sy+6);
-        lg.addColorStop(0, "#fff0bf");
-        lg.addColorStop(0.35, "#ffb24f");
-        lg.addColorStop(0.6, "#ff6a00");
-        lg.addColorStop(1, "#fff0bf");
+        lg.addColorStop(0, "#fff0bf"); lg.addColorStop(0.35, "#ffb24f"); lg.addColorStop(0.6, "#ff6a00"); lg.addColorStop(1, "#fff0bf");
         ctx.fillStyle = lg;
-        // glow
         ctx.shadowColor = `rgba(255,180,60,${0.55 + 0.35*pulse})`;
         ctx.shadowBlur = 10 + 10 * pulse;
         ctx.fillText("Sign", Math.round(sx)+0.5, Math.round(sy)+0.5);
@@ -1108,15 +1159,19 @@
 
     /* Landscape + trees + houses + decos */
     function drawLandscape(camX, camY, vw, vh) {
-      ctx.fillStyle = "#7ccb53"; ctx.fillRect(0, 0, vw, vh);
-
-      // subtle ground texture
-      const tile = 16;
-      for (let gx = Math.floor(camX / tile) * tile; gx < camX + vw + tile; gx += tile) {
-        for (let gy = Math.floor(camY / tile) * tile; gy < camY + vh + tile; gy += tile) {
-          const sx = gx - camX, sy = gy - camY;
-          ctx.fillStyle = "#6bb946"; ctx.fillRect(sx + 10, sy + 6, 2, 2);
-          ctx.fillStyle = "#8edc64"; ctx.fillRect(sx + 6, sy + 3, 2, 2);
+      // Base ground — use grass.jpg if present, else flat green with subtle texture
+      if (GRASS_PATTERN) {
+        ctx.fillStyle = GRASS_PATTERN;
+        ctx.fillRect(0, 0, vw, vh);
+      } else {
+        ctx.fillStyle = "#7ccb53"; ctx.fillRect(0, 0, vw, vh);
+        const tile = 16;
+        for (let gx = Math.floor(camX / tile) * tile; gx < camX + vw + tile; gx += tile) {
+          for (let gy = Math.floor(camY / tile) * tile; gy < camY + vh + tile; gy += tile) {
+            const sx = gx - camX, sy = gy - camY;
+            ctx.fillStyle = "#6bb946"; ctx.fillRect(sx + 10, sy + 6, 2, 2);
+            ctx.fillStyle = "#8edc64"; ctx.fillRect(sx + 6, sy + 3, 2, 2);
+          }
         }
       }
 
@@ -1135,10 +1190,10 @@
     }
 
     function drawHouse(x, y, s=1) {
-      ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(s, s);
+      ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(s * HOUSE_SCALE, s * HOUSE_SCALE);
       if (CUSTOM_HOUSE_IMAGE) {
         const img = CUSTOM_HOUSE_IMAGE;
-        const w = 50, h = 36; // base footprint
+        const w = 50, h = 36; // base footprint before scaling
         ctx.drawImage(img, Math.floor(-w/2), Math.floor(-h+20), Math.floor(w), Math.floor(h));
         ctx.restore(); return;
       }
@@ -1316,6 +1371,7 @@
       loadOptionalTreeImages();
       loadOptionalHouseImage();
       loadOptionalDecos();
+      loadOptionalGrassTile(); // optional: use grass.jpg to replace ground
       setTimeout(() => FarcadeSafe.ready(), 250);
     }
     function startGame() {
